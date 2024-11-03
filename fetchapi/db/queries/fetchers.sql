@@ -1,6 +1,6 @@
 -- name: AddFetcher :one
-INSERT INTO fetchers(id, api_id, api_hash)
-VALUES ($1, $2, $3)
+INSERT INTO fetchers(id, phone)
+VALUES ($1, $2)
 RETURNING *;
 
 -- name: DeleteFetcher :exec

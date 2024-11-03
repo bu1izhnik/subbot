@@ -2,8 +2,7 @@
 
 CREATE TABLE fetchers(
     id BIGINT PRIMARY KEY,
-    api_id BIGINT,
-    api_hash TEXT
+    phone TEXT
 );
 
 -- +goose Down

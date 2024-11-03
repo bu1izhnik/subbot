@@ -11,21 +11,20 @@ import (
 )
 
 const addFetcher = `-- name: AddFetcher :one
-INSERT INTO fetchers(id, api_id, api_hash)
-VALUES ($1, $2, $3)
-RETURNING id, api_id, api_hash
+INSERT INTO fetchers(id, phone)
+VALUES ($1, $2)
+RETURNING id, phone
 `
 
 type AddFetcherParams struct {
-	ID      int64
-	ApiID   sql.NullInt64
-	ApiHash sql.NullString
+	ID    int64
+	Phone sql.NullString
 }
 
 func (q *Queries) AddFetcher(ctx context.Context, arg AddFetcherParams) (Fetcher, error) {
-	row := q.db.QueryRowContext(ctx, addFetcher, arg.ID, arg.ApiID, arg.ApiHash)
+	row := q.db.QueryRowContext(ctx, addFetcher, arg.ID, arg.Phone)
 	var i Fetcher
-	err := row.Scan(&i.ID, &i.ApiID, &i.ApiHash)
+	err := row.Scan(&i.ID, &i.Phone)
 	return i, err
 }
 

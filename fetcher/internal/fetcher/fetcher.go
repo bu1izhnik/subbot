@@ -2,15 +2,19 @@ package fetcher
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"github.com/BulizhnikGames/subbot/fetcher/tools"
 	"github.com/gotd/td/telegram"
 	"github.com/gotd/td/telegram/auth"
 	"github.com/gotd/td/telegram/updates"
 	"github.com/gotd/td/tg"
 	"log"
+	"net/http"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -59,7 +63,7 @@ func Init(apiID int, apiHash string, botChat int64) (*Fetcher, error) {
 	}, nil
 }
 
-func (s *Fetcher) Run(phone string, password string) error {
+func (s *Fetcher) Run(phone string, password string, apiURL string) error {
 	codePrompt := func(ctx context.Context, sentCode *tg.AuthSentCode) (string, error) {
 		log.Print("Enter code: ")
 		code, err := bufio.NewReader(os.Stdin).ReadString('\n')
@@ -82,6 +86,18 @@ func (s *Fetcher) Run(phone string, password string) error {
 		}
 
 		user, err := s.client.Self(ctx)
+		if err != nil {
+			return err
+		}
+
+		jsonBody := []byte(fmt.Sprintf("{\"phone\": \"%s\"}", phone))
+		bodyReader := bytes.NewReader(jsonBody)
+		requestURL := apiURL + "/" + strconv.FormatInt(user.ID, 10)
+		req, err := http.NewRequest(http.MethodPost, requestURL, bodyReader)
+		if err != nil {
+			return err
+		}
+		_, err = http.DefaultClient.Do(req)
 		if err != nil {
 			return err
 		}
@@ -114,7 +130,7 @@ func (s *Fetcher) SubscribeToChannel(ctx context.Context, channelName string) (i
 	return channelID, accessHash, err
 }
 
-func (s *Fetcher) GetUsername(ctx context.Context, channelID int64) error {
+/*func (s *Fetcher) GetUsername(ctx context.Context, channelID int64) error {
 	channel := tg.InputChannel{ChannelID: channelID}
 	res, err := s.client.API().ChannelsGetFullChannel(ctx, &channel)
 	if err != nil {
@@ -122,4 +138,4 @@ func (s *Fetcher) GetUsername(ctx context.Context, channelID int64) error {
 	}
 	log.Printf("Channel: %s", res.String())
 	return nil
-}
+}*/

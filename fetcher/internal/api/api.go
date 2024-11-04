@@ -20,7 +20,7 @@ type Api struct {
 func Init(f *fetcher.Fetcher, port string) *Api {
 	api := &Api{f: f}
 	router := chi.NewRouter()
-	router.Post("/{channelName}", api.HandleSubscribe)
+	router.Post("/{channelName}", api.handleSubscribe)
 	api.server = &http.Server{
 		Handler: router,
 		Addr:    ":" + port,
@@ -32,7 +32,7 @@ func (api *Api) Run() error {
 	return api.server.ListenAndServe()
 }
 
-func (api *Api) HandleSubscribe(w http.ResponseWriter, r *http.Request) {
+func (api *Api) handleSubscribe(w http.ResponseWriter, r *http.Request) {
 	channelName := chi.URLParam(r, "channelName")
 	channelID, accessHash, err := api.f.SubscribeToChannel(r.Context(), channelName)
 	if err != nil {
@@ -40,7 +40,7 @@ func (api *Api) HandleSubscribe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	responseWithJSON(w, http.StatusOK, channelData{
+	responseWithJSON(w, http.StatusCreated, channelData{
 		Username:   channelName,
 		ChannelID:  channelID,
 		AccessHash: accessHash,

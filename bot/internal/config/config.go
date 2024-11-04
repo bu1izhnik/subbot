@@ -6,6 +6,8 @@ import (
 	"os"
 )
 
+const SUB_LIMIT = 10
+
 type Config struct {
 	BotToken string
 	DBURL    string

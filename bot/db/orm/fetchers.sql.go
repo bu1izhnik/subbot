@@ -10,18 +10,27 @@ import (
 )
 
 const addFetcher = `-- name: AddFetcher :one
-INSERT INTO fetchers(id, phone)
-VALUES ($1, $2)
+INSERT INTO fetchers(id, phone, ip, port)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (id) DO UPDATE
+SET phone = $2, ip = $3, port = $4
 RETURNING id, phone, ip, port
 `
 
 type AddFetcherParams struct {
 	ID    int64
 	Phone string
+	Ip    string
+	Port  string
 }
 
 func (q *Queries) AddFetcher(ctx context.Context, arg AddFetcherParams) (Fetcher, error) {
-	row := q.db.QueryRowContext(ctx, addFetcher, arg.ID, arg.Phone)
+	row := q.db.QueryRowContext(ctx, addFetcher,
+		arg.ID,
+		arg.Phone,
+		arg.Ip,
+		arg.Port,
+	)
 	var i Fetcher
 	err := row.Scan(
 		&i.ID,
@@ -56,7 +65,7 @@ func (q *Queries) DeleteFetcher(ctx context.Context, id int64) error {
 }
 
 const getLeastFullFetcher = `-- name: GetLeastFullFetcher :one
-SELECT fetchers.id, fetchers.ip, fetchers.port
+SELECT fetchers.ip, fetchers.port
 FROM fetchers JOIN channels
 ON fetchers.id = channels.stored_at
 GROUP BY fetchers.id
@@ -65,7 +74,6 @@ LIMIT 1
 `
 
 type GetLeastFullFetcherRow struct {
-	ID   int64
 	Ip   string
 	Port string
 }
@@ -73,6 +81,6 @@ type GetLeastFullFetcherRow struct {
 func (q *Queries) GetLeastFullFetcher(ctx context.Context) (GetLeastFullFetcherRow, error) {
 	row := q.db.QueryRowContext(ctx, getLeastFullFetcher)
 	var i GetLeastFullFetcherRow
-	err := row.Scan(&i.ID, &i.Ip, &i.Port)
+	err := row.Scan(&i.Ip, &i.Port)
 	return i, err
 }

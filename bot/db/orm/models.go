@@ -4,10 +4,6 @@
 
 package orm
 
-import (
-	"database/sql"
-)
-
 type Channel struct {
 	ID       int64
 	Hash     int64
@@ -17,7 +13,9 @@ type Channel struct {
 
 type Fetcher struct {
 	ID    int64
-	Phone sql.NullString
+	Phone string
+	Ip    string
+	Port  string
 }
 
 type Sub struct {

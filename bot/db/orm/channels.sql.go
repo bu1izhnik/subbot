@@ -9,6 +9,36 @@ import (
 	"context"
 )
 
+const addChannel = `-- name: AddChannel :one
+INSERT INTO channels(id, hash, username, stored_at)
+VALUES($1, $2, $3, $4)
+    RETURNING id, hash, username, stored_at
+`
+
+type AddChannelParams struct {
+	ID       int64
+	Hash     int64
+	Username string
+	StoredAt int64
+}
+
+func (q *Queries) AddChannel(ctx context.Context, arg AddChannelParams) (Channel, error) {
+	row := q.db.QueryRowContext(ctx, addChannel,
+		arg.ID,
+		arg.Hash,
+		arg.Username,
+		arg.StoredAt,
+	)
+	var i Channel
+	err := row.Scan(
+		&i.ID,
+		&i.Hash,
+		&i.Username,
+		&i.StoredAt,
+	)
+	return i, err
+}
+
 const changeChannelUsername = `-- name: ChangeChannelUsername :exec
 UPDATE channels
 SET username = $2
@@ -22,6 +52,16 @@ type ChangeChannelUsernameParams struct {
 
 func (q *Queries) ChangeChannelUsername(ctx context.Context, arg ChangeChannelUsernameParams) error {
 	_, err := q.db.ExecContext(ctx, changeChannelUsername, arg.ID, arg.Username)
+	return err
+}
+
+const deleteChannel = `-- name: DeleteChannel :exec
+DELETE FROM channels
+WHERE id = $1
+`
+
+func (q *Queries) DeleteChannel(ctx context.Context, id int64) error {
+	_, err := q.db.ExecContext(ctx, deleteChannel, id)
 	return err
 }
 

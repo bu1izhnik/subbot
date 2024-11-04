@@ -63,7 +63,7 @@ func Init(apiID int, apiHash string, botChat int64) (*Fetcher, error) {
 	}, nil
 }
 
-func (s *Fetcher) Run(phone string, password string, apiURL string) error {
+func (s *Fetcher) Run(phone string, password string, apiURL string, IP string, port string) error {
 	codePrompt := func(ctx context.Context, sentCode *tg.AuthSentCode) (string, error) {
 		log.Print("Enter code: ")
 		code, err := bufio.NewReader(os.Stdin).ReadString('\n')
@@ -90,7 +90,7 @@ func (s *Fetcher) Run(phone string, password string, apiURL string) error {
 			return err
 		}
 
-		jsonBody := []byte(fmt.Sprintf("{\"phone\": \"%s\"}", phone))
+		jsonBody := []byte(fmt.Sprintf("{\"phone\": \"%s\" \"ip\": \"%s\" \"port\": \"%s\"}", phone, IP, port))
 		bodyReader := bytes.NewReader(jsonBody)
 		requestURL := apiURL + "/" + strconv.FormatInt(user.ID, 10)
 		req, err := http.NewRequest(http.MethodPost, requestURL, bodyReader)
@@ -99,7 +99,7 @@ func (s *Fetcher) Run(phone string, password string, apiURL string) error {
 		}
 		_, err = http.DefaultClient.Do(req)
 		if err != nil {
-			return err
+			//return err
 		}
 
 		log.Printf("Scraper is %s:", user.Username)

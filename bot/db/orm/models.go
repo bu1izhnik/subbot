@@ -16,9 +16,8 @@ type Channel struct {
 }
 
 type Fetcher struct {
-	ID      int64
-	ApiID   sql.NullInt64
-	ApiHash sql.NullString
+	ID    int64
+	Phone sql.NullString
 }
 
 type Sub struct {

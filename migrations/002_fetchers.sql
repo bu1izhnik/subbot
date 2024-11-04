@@ -2,7 +2,9 @@
 
 CREATE TABLE fetchers(
     id BIGINT PRIMARY KEY,
-    phone TEXT
+    phone TEXT,
+    ip TEXT,
+    port TEXT
 );
 
 -- +goose Down

@@ -2,7 +2,11 @@ module github.com/BulizhnikGames/subbot/fetcher
 
 go 1.23.0
 
-require github.com/gotd/td v0.111.2
+require (
+	github.com/go-chi/chi/v5 v5.1.0
+	github.com/gotd/td v0.111.2
+	github.com/joho/godotenv v1.5.1
+)
 
 require (
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect

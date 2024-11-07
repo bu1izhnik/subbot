@@ -62,7 +62,7 @@ func Init(apiID int, apiHash string, botChat int64) (*Fetcher, error) {
 			return errors.New("unexpected channel")
 		}
 
-		getBot, err := client.API().UsersGetFullUser(ctx, &tg.InputUser{
+		/*getBot, err := client.API().UsersGetFullUser(ctx, &tg.InputUser{
 			UserID:     botChat,
 			AccessHash: 0,
 		})
@@ -76,7 +76,27 @@ func Init(apiID int, apiHash string, botChat int64) (*Fetcher, error) {
 			return errors.New("unexpected bot")
 		}
 
-		log.Printf("%v, %v \n %v, %v", peer.ChannelID, channel.AccessHash, bot.ID)
+		log.Printf("%v, %v \n %v, %v", peer.ChannelID, channel.AccessHash, bot.ID)*/
+
+		resolved, err := client.API().ContactsResolveUsername(ctx, "stonesubbot")
+		if err != nil {
+			log.Printf("failed to resolve username: %v", err)
+			return err
+		}
+
+		// Prepare InputPeer for the bot
+		var botPeer tg.InputPeerClass
+		if len(resolved.Users) > 0 {
+			user := resolved.Users[0]
+			if u, ok := user.(*tg.User); ok {
+				botPeer = &tg.InputPeerUser{
+					UserID:     u.ID,
+					AccessHash: u.AccessHash,
+				}
+			}
+		} else {
+			return fmt.Errorf("could not resolve bot username")
+		}
 
 		messageID, err := tools.GetMessageIDFromMessage(msg.String())
 		if err != nil {
@@ -88,9 +108,7 @@ func Init(apiID int, apiHash string, botChat int64) (*Fetcher, error) {
 				ChannelID:  peer.ChannelID,
 				AccessHash: channel.AccessHash,
 			},
-			ToPeer: &tg.InputPeerChat{
-				ChatID: bot.ID,
-			},
+			ToPeer:   botPeer,
 			ID:       []int{messageID},
 			RandomID: []int64{rand.Int63()},
 		})

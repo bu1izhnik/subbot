@@ -5,30 +5,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="9e20bb0c-dde4-4ac2-8bc3-e36214860bf5" name="Changes" comment="del command&#10;bug fixes&#10;forwarding messages from fetcher&#10;fetcher WIP">
-      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/go.imports.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/bot/cmd/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/bot/cmd/main.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/bot/db/orm/channels.sql.go" beforeDir="false" afterPath="$PROJECT_DIR$/bot/db/orm/channels.sql.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/bot/db/orm/fetchers.sql.go" beforeDir="false" afterPath="$PROJECT_DIR$/bot/db/orm/fetchers.sql.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/bot/db/orm/subs.sql.go" beforeDir="false" afterPath="$PROJECT_DIR$/bot/db/orm/subs.sql.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/bot/db/queries/channels.sql" beforeDir="false" afterPath="$PROJECT_DIR$/bot/db/queries/channels.sql" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/bot/db/queries/fetchers.sql" beforeDir="false" afterPath="$PROJECT_DIR$/bot/db/queries/fetchers.sql" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/bot/db/queries/subs.sql" beforeDir="false" afterPath="$PROJECT_DIR$/bot/db/queries/subs.sql" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/bot/go.mod" beforeDir="false" afterPath="$PROJECT_DIR$/bot/go.mod" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/bot/go.sum" beforeDir="false" afterPath="$PROJECT_DIR$/bot/go.sum" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/bot/internal/api/api.go" beforeDir="false" afterPath="$PROJECT_DIR$/bot/internal/api/api.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/bot/internal/bot/bot.go" beforeDir="false" afterPath="$PROJECT_DIR$/bot/internal/bot/bot.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/bot/internal/commands/del.go" beforeDir="false" afterPath="$PROJECT_DIR$/bot/internal/commands/del.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/bot/internal/commands/list.go" beforeDir="false" afterPath="$PROJECT_DIR$/bot/internal/commands/list.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/bot/internal/commands/middleware/fetcherOrUser.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/bot/internal/commands/middleware/userNext.go" beforeDir="false" afterPath="$PROJECT_DIR$/bot/internal/commands/middleware/userNext.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/bot/internal/commands/sub.go" beforeDir="false" afterPath="$PROJECT_DIR$/bot/internal/commands/sub.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/bot/internal/config/config.go" beforeDir="false" afterPath="$PROJECT_DIR$/bot/internal/config/config.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/bot/tools/tools.go" beforeDir="false" afterPath="$PROJECT_DIR$/bot/tools/tools.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/fetcher/internal/api/api.go" beforeDir="false" afterPath="$PROJECT_DIR$/fetcher/internal/api/api.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/fetcher/internal/fetcher/fetcher.go" beforeDir="false" afterPath="$PROJECT_DIR$/fetcher/internal/fetcher/fetcher.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/fetcher/tools/tools.go" beforeDir="false" afterPath="$PROJECT_DIR$/fetcher/tools/tools.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

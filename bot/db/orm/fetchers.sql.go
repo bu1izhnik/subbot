@@ -84,3 +84,43 @@ func (q *Queries) GetLeastFullFetcher(ctx context.Context) (GetLeastFullFetcherR
 	err := row.Scan(&i.Ip, &i.Port)
 	return i, err
 }
+
+const getMostFullFetcher = `-- name: GetMostFullFetcher :one
+SELECT fetchers.ip, fetchers.port
+FROM fetchers JOIN channels
+ON fetchers.id = channels.stored_at
+GROUP BY fetchers.id
+ORDER BY COUNT(*) DESC
+LIMIT 1
+`
+
+type GetMostFullFetcherRow struct {
+	Ip   string
+	Port string
+}
+
+func (q *Queries) GetMostFullFetcher(ctx context.Context) (GetMostFullFetcherRow, error) {
+	row := q.db.QueryRowContext(ctx, getMostFullFetcher)
+	var i GetMostFullFetcherRow
+	err := row.Scan(&i.Ip, &i.Port)
+	return i, err
+}
+
+const getRandomFetcher = `-- name: GetRandomFetcher :one
+SELECT fetchers.ip, fetchers.port
+FROM fetchers
+ORDER BY RANDOM()
+LIMIT 1
+`
+
+type GetRandomFetcherRow struct {
+	Ip   string
+	Port string
+}
+
+func (q *Queries) GetRandomFetcher(ctx context.Context) (GetRandomFetcherRow, error) {
+	row := q.db.QueryRowContext(ctx, getRandomFetcher)
+	var i GetRandomFetcherRow
+	err := row.Scan(&i.Ip, &i.Port)
+	return i, err
+}

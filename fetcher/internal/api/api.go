@@ -21,6 +21,7 @@ func Init(f *fetcher.Fetcher, port string) *Api {
 	api := &Api{f: f}
 	router := chi.NewRouter()
 	router.Post("/{channelName}", api.handleSubscribe)
+	router.Get("/{channelName}", api.handleGetChannelInfo)
 	api.server = &http.Server{
 		Handler: router,
 		Addr:    ":" + port,
@@ -41,6 +42,22 @@ func (api *Api) handleSubscribe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	responseWithJSON(w, http.StatusCreated, channelData{
+		Username:   channelName,
+		ChannelID:  channelID,
+		AccessHash: accessHash,
+	})
+}
+
+func (api *Api) handleGetChannelInfo(w http.ResponseWriter, r *http.Request) {
+	channelName := chi.URLParam(r, "channelName")
+	channelID, accessHash, err := api.f.GetChannelInfo(r.Context(), channelName)
+
+	if err != nil {
+		responseWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	responseWithJSON(w, http.StatusOK, channelData{
 		Username:   channelName,
 		ChannelID:  channelID,
 		AccessHash: accessHash,

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/BulizhnikGames/subbot/bot/db/orm"
 	"github.com/go-chi/chi/v5"
+	"log"
 	"net/http"
 	"strconv"
 )
@@ -43,6 +44,7 @@ func (api *Api) registerFetcher(w http.ResponseWriter, r *http.Request) {
 	fetcher := &fetcherParams{}
 	err = decoder.Decode(fetcher)
 	if err != nil {
+		log.Printf("Failed to parse fetcher params: %s", err.Error())
 		responseWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}

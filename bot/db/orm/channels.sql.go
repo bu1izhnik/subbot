@@ -12,7 +12,7 @@ import (
 const addChannel = `-- name: AddChannel :one
 INSERT INTO channels(id, hash, username, stored_at)
 VALUES($1, $2, $3, $4)
-    RETURNING id, hash, username, stored_at
+RETURNING id, hash, username, stored_at
 `
 
 type AddChannelParams struct {
@@ -52,6 +52,23 @@ type ChangeChannelUsernameParams struct {
 
 func (q *Queries) ChangeChannelUsername(ctx context.Context, arg ChangeChannelUsernameParams) error {
 	_, err := q.db.ExecContext(ctx, changeChannelUsername, arg.ID, arg.Username)
+	return err
+}
+
+const changeChannelUsernameAndHash = `-- name: ChangeChannelUsernameAndHash :exec
+UPDATE channels
+SET username = $2, hash = $3
+WHERE id = $1
+`
+
+type ChangeChannelUsernameAndHashParams struct {
+	ID       int64
+	Username string
+	Hash     int64
+}
+
+func (q *Queries) ChangeChannelUsernameAndHash(ctx context.Context, arg ChangeChannelUsernameAndHashParams) error {
+	_, err := q.db.ExecContext(ctx, changeChannelUsernameAndHash, arg.ID, arg.Username, arg.Hash)
 	return err
 }
 

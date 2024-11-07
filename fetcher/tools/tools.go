@@ -6,25 +6,14 @@ import (
 	"strings"
 )
 
-func GetChannelIDFromMessage(msg string) (int64, error) {
-	channelIDIndex := strings.Index(msg, "ChannelID:")
-	closeBracketIndex := strings.Index(msg, "}")
-	if channelIDIndex == -1 || closeBracketIndex == -1 {
-		return -1, errors.New("unexpected message format")
-	}
-	channelIDStr := msg[channelIDIndex+10 : closeBracketIndex]
-	channelID, err := strconv.ParseInt(channelIDStr, 10, 64)
-	return channelID, err
-}
-
-func GetMessageIDFromMessage(msg string) (int64, error) {
+func GetMessageIDFromMessage(msg string) (int, error) {
 	messageIDIndex := strings.Index(msg, " ID:")
 	fromIDIndex := strings.Index(msg, " FromID:")
 	if messageIDIndex == -1 || fromIDIndex == -1 {
 		return -1, errors.New("unexpected message format")
 	}
 	messageIDStr := msg[messageIDIndex+4 : fromIDIndex]
-	messageID, err := strconv.ParseInt(messageIDStr, 10, 64)
+	messageID, err := strconv.Atoi(messageIDStr)
 	return messageID, err
 }
 

@@ -24,8 +24,8 @@ func Load() {
 func Get() Config {
 	c := Config{}
 
-	BotToken := os.Getenv("BOT_TOKEN")
-	if BotToken == "" {
+	c.BotToken = os.Getenv("BOT_TOKEN")
+	if c.BotToken == "" {
 		log.Fatal("Bot token not found in .env")
 	}
 

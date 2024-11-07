@@ -40,7 +40,7 @@ func (b *Bot) Run() {
 	for {
 		select {
 		case update := <-updates:
-			err := b.HandleUpdate(context.Background(), update)
+			err := b.handleUpdate(context.Background(), update)
 			if err != nil {
 				log.Printf("Error handling update: %v", err)
 			}
@@ -48,7 +48,7 @@ func (b *Bot) Run() {
 	}
 }
 
-func (b *Bot) HandleUpdate(context context.Context, update tgbotapi.Update) error {
+func (b *Bot) handleUpdate(ctx context.Context, update tgbotapi.Update) error {
 	if update.Message == nil {
 		return nil
 	}
@@ -58,11 +58,64 @@ func (b *Bot) HandleUpdate(context context.Context, update tgbotapi.Update) erro
 	//TODO: Handle forwarded messages from fetchers
 	//TODO: Add /help
 
+	if isFetcher, err := b.isFromFetcher(update); err != nil {
+		return err
+	} else if isFetcher {
+		go b.forwardFromFetcher(ctx, update)
+		return nil
+	}
+
 	msgCmd := update.Message.Command()
 	cmd, ok := b.commands[msgCmd]
 	if !ok {
 		_, err := b.api.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Несуществующая комманда"))
 		return err
 	}
-	return cmd(context, b.api, update)
+	go func(ctx context.Context, update tgbotapi.Update) {
+		err := cmd(ctx, b.api, update)
+		if err != nil {
+			log.Printf("Error executing user's command: %v", err)
+		}
+	}(ctx, update)
+	return nil
+}
+
+func (b *Bot) forwardFromFetcher(ctx context.Context, update tgbotapi.Update) {
+	channelID := update.Message.ForwardFrom.ID
+
+	groups, err := b.db.GetSubsOfChannel(ctx, channelID)
+	if err != nil {
+		log.Printf("Error getting subs of channel: %v", err)
+	}
+
+	for _, group := range groups {
+		b.tryUpdateChannelName(ctx, channelID, update.Message.ForwardFrom.UserName)
+		_, err := b.api.Send(tgbotapi.NewForward(group, update.Message.Chat.ID, update.Message.MessageID))
+		if err != nil {
+			log.Printf("Error sending forward from channel %v to group %v: %v", channelID, group, err)
+		}
+	}
+}
+
+func (b *Bot) isFromFetcher(update tgbotapi.Update) (bool, error) {
+	if update.Message.Text == "" {
+		return false, nil
+	}
+	isFetcher, err := b.db.CheckFetcher(context.Background(), update.Message.From.ID)
+	if err != nil {
+		return false, err
+	}
+	if isFetcher == 1 {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (b *Bot) tryUpdateChannelName(ctx context.Context, channelID int64, channelName string) {
+	if err := b.db.ChangeChannelUsername(ctx, orm.ChangeChannelUsernameParams{
+		ID:       channelID,
+		Username: channelName,
+	}); err != nil {
+		log.Printf("Error changing channel (%v) name to %v: %v", channelID, channelName, err)
+	}
 }

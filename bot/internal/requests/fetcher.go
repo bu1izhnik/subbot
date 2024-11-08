@@ -2,6 +2,7 @@ package requests
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 )
 
@@ -18,8 +19,11 @@ func ResolveChannelName(reqURL string) (*ChannelData, error) {
 	}
 
 	res, err := http.DefaultClient.Do(req)
-	if err != nil || res.StatusCode != http.StatusOK {
+	if err != nil {
 		return nil, err
+	}
+	if res.StatusCode != http.StatusOK {
+		return nil, errors.New("could not resolve channel name")
 	}
 
 	decoder := json.NewDecoder(res.Body)
@@ -38,8 +42,11 @@ func SubscribeToChannel(reqURL string) (*ChannelData, error) {
 	}
 
 	res, err := http.DefaultClient.Do(req)
-	if err != nil || res.StatusCode != http.StatusCreated {
+	if err != nil {
 		return nil, err
+	}
+	if res.StatusCode != http.StatusCreated {
+		return nil, errors.New("could not subscribe to channel")
 	}
 
 	decoder := json.NewDecoder(res.Body)

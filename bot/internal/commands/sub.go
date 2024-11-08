@@ -9,7 +9,6 @@ import (
 	"github.com/BulizhnikGames/subbot/bot/internal/requests"
 	"github.com/BulizhnikGames/subbot/bot/tools"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"strings"
 )
 
 func SubNext(db *orm.Queries) bot.Command {
@@ -38,26 +37,13 @@ func sub(db *orm.Queries) bot.Command {
 			return err
 		}
 
-		//TODO: firstly check if channel is already stored at some parser
-
-		var requestURL string
-		fetcherAdr, err := db.GetLeastFullFetcher(ctx)
+		fetcher, err := tools.GetFetcher(ctx, db, tools.GetLeastFullFetcher)
 		if err != nil {
-			if strings.Contains(err.Error(), "no rows") {
-				rndFetcherAdr, err := db.GetRandomFetcher(ctx)
-				if err != nil {
-					tools.SendWithErrorLogging(api, tgbotapi.NewMessage(groupID, "Не вышло подписаться на канал: internal error."))
-					return err
-				}
-				requestURL = "http://" + rndFetcherAdr.Ip + ":" + rndFetcherAdr.Port + "/" + channelName
-			} else {
-				tools.SendWithErrorLogging(api, tgbotapi.NewMessage(groupID, "Не вышло подписаться на канал: internal error."))
-				return err
-			}
-		} else {
-			requestURL = "http://" + fetcherAdr.Ip + ":" + fetcherAdr.Port + "/" + channelName
+			tools.SendWithErrorLogging(api, tgbotapi.NewMessage(groupID, "Не вышло подписаться на канал: internal error."))
+			return err
 		}
 
+		requestURL := "http://" + fetcher.Ip + ":" + fetcher.Port + "/" + channelName
 		channelCheck, err := requests.ResolveChannelName(requestURL)
 		if err != nil {
 			tools.SendWithErrorLogging(api, tgbotapi.NewMessage(groupID, "Не вышло подписаться на канал: internal error."))
@@ -89,7 +75,7 @@ func sub(db *orm.Queries) bot.Command {
 				ID:       channel.ChannelID,
 				Hash:     channel.AccessHash,
 				Username: channel.Username,
-				StoredAt: fetcherAdr.ID,
+				StoredAt: fetcher.ID,
 			})
 			if err != nil {
 				tools.SendWithErrorLogging(api, tgbotapi.NewMessage(groupID, "Не вышло подписаться на канал: internal error."))

@@ -11,7 +11,7 @@ import (
 	"log"
 )
 
-func delNext(db *orm.Queries) bot.Command {
+func DelNext(db *orm.Queries) bot.Command {
 	return func(ctx context.Context, api *tgbotapi.BotAPI, update tgbotapi.Update) error {
 		middleware.UserNext.Mutex.Lock()
 		middleware.UserNext.List[update.Message.From.ID] = middleware.GroupOnly(middleware.AdminOnly(del(db)))
@@ -26,13 +26,13 @@ func del(db *orm.Queries) bot.Command {
 		groupID := update.Message.Chat.ID
 		channelName := tools.GetChannelUsername(update.Message.Text)
 
-		fetcherAdr, err := db.GetMostFullFetcher(context.Background())
+		fetcher, err := tools.GetFetcher(ctx, db, tools.GetMostFullFetcher)
 		if err != nil {
 			tools.SendWithErrorLogging(api, tgbotapi.NewMessage(groupID, "Не вышло отписаться от канала: internal error."))
 			return err
 		}
 
-		requestURL := "http://" + fetcherAdr.Ip + ":" + fetcherAdr.Port + "/" + channelName
+		requestURL := "http://" + fetcher.Ip + ":" + fetcher.Port + "/" + channelName
 		channel, err := requests.ResolveChannelName(requestURL)
 		if err != nil {
 			tools.SendWithErrorLogging(api, tgbotapi.NewMessage(groupID, "Не вышло отписаться от канала: internal error."))

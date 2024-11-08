@@ -8,8 +8,6 @@ import (
 	"sync"
 )
 
-//TODO: add mutex
-
 var UserNext tools.AsyncMap[int64, bot.Command]
 
 func Init() {
@@ -19,11 +17,25 @@ func Init() {
 	}
 }
 
+func IfUserHasNext(next bot.Command) bot.Command {
+	return func(ctx context.Context, api *tgbotapi.BotAPI, update tgbotapi.Update) error {
+		userID := update.Message.From.ID
+		UserNext.Mutex.Lock()
+		if cmd, ok := UserNext.List[userID]; ok && cmd != nil {
+			UserNext.Mutex.Unlock()
+			return next(ctx, api, update)
+		} else {
+			UserNext.Mutex.Unlock()
+			return nil
+		}
+	}
+}
+
 func GetUsersNext() bot.Command {
 	return func(ctx context.Context, api *tgbotapi.BotAPI, update tgbotapi.Update) error {
 		userID := update.Message.From.ID
 		UserNext.Mutex.Lock()
-		if command, ok := UserNext.List[userID]; ok {
+		if command, ok := UserNext.List[userID]; ok && command != nil {
 			UserNext.Mutex.Unlock()
 			defer func() {
 				UserNext.Mutex.Lock()

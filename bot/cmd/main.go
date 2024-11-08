@@ -14,6 +14,9 @@ import (
 	"time"
 )
 
+// TODO: add /help
+// TODO: give each channel it's ID when it fetcher forwards it
+
 func main() {
 	config.Load()
 	cfg := config.Get()
@@ -41,11 +44,15 @@ func main() {
 	)
 	Bot.RegisterCommand(
 		"sub",
-		middleware.GroupOnly(middleware.AdminOnly(commands.SubNext(dbOrm))),
+		middleware.AdminOnly(middleware.GroupOnly(commands.SubNext(dbOrm))),
+	)
+	Bot.RegisterCommand(
+		"del",
+		middleware.AdminOnly(middleware.GroupOnly(commands.DelNext(dbOrm))),
 	)
 	Bot.RegisterCommand(
 		"",
-		middleware.GroupOnly(middleware.AdminOnly(middleware.GetUsersNext())),
+		middleware.IfUserHasNext(middleware.AdminOnly(middleware.GroupOnly(middleware.GetUsersNext()))),
 	)
 	go func() {
 		Bot.Run()

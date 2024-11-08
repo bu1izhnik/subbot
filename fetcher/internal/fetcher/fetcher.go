@@ -24,12 +24,15 @@ type Fetcher struct {
 	gaps   *updates.Manager
 }
 
-func Init(apiID int, apiHash string, botID int64, botHash int64) (*Fetcher, error) {
+func Init(apiID int, apiHash string) (*Fetcher, error) {
 	d := tg.NewUpdateDispatcher()
 	gaps := updates.New(updates.Config{
 		Handler: d,
 	})
-	client := telegram.NewClient(apiID, apiHash, telegram.Options{UpdateHandler: gaps})
+	session := telegram.FileSessionStorage{
+		Path: "./session.json",
+	}
+	client := telegram.NewClient(apiID, apiHash, telegram.Options{UpdateHandler: gaps, SessionStorage: &session})
 	d.OnNewChannelMessage(func(ctx context.Context, e tg.Entities, update *tg.UpdateNewChannelMessage) error {
 		msg, ok := update.Message.(*tg.Message)
 		if !ok {
@@ -83,7 +86,7 @@ func Init(apiID int, apiHash string, botID int64, botHash int64) (*Fetcher, erro
 
 		log.Printf("%v, %v \n %v, %v", peer.ChannelID, channel.AccessHash, bot.ID)*/
 
-		/*resolved, err := client.API().ContactsResolveUsername(ctx, "stonesubbot")
+		resolved, err := client.API().ContactsResolveUsername(ctx, "stonesubbot")
 		if err != nil {
 			log.Printf("failed to resolve username: %v", err)
 			return err
@@ -102,7 +105,7 @@ func Init(apiID int, apiHash string, botID int64, botHash int64) (*Fetcher, erro
 			return fmt.Errorf("could not resolve bot username")
 		}
 
-		log.Printf("%v, %v", botPeer.(*tg.InputPeerUser).UserID, botPeer.(*tg.InputPeerUser).AccessHash)*/
+		//log.Printf("%v, %v", botPeer.(*tg.InputPeerUser).UserID, botPeer.(*tg.InputPeerUser).AccessHash)
 
 		messageID, err := tools.GetMessageIDFromMessage(msg.String())
 		if err != nil {
@@ -114,10 +117,7 @@ func Init(apiID int, apiHash string, botID int64, botHash int64) (*Fetcher, erro
 				ChannelID:  peer.ChannelID,
 				AccessHash: channel.AccessHash,
 			},
-			ToPeer: &tg.InputPeerUser{
-				UserID:     botID,
-				AccessHash: botHash,
-			},
+			ToPeer:   botPeer,
 			ID:       []int{messageID},
 			RandomID: []int64{rand.Int63()},
 		})

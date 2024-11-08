@@ -15,7 +15,6 @@ import (
 )
 
 // TODO: add /help
-// TODO: give each channel it's ID when it fetcher forwards it
 
 func main() {
 	config.Load()

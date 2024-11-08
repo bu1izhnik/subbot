@@ -3,7 +3,6 @@ package bot
 import (
 	"context"
 	"github.com/BulizhnikGames/subbot/bot/db/orm"
-	"github.com/BulizhnikGames/subbot/bot/internal/requests"
 	"github.com/BulizhnikGames/subbot/bot/tools"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"log"
@@ -57,8 +56,6 @@ func (b *Bot) handleUpdate(ctx context.Context, update tgbotapi.Update) error {
 
 	log.Printf("chat id: %v, message id: %v", update.Message.Chat.ID, update.Message.MessageID)
 
-	//TODO: Add /help
-
 	if isFetcher, err := b.isFromFetcher(update); err != nil {
 		return err
 	} else if isFetcher {
@@ -87,32 +84,25 @@ func (b *Bot) forwardFromFetcher(ctx context.Context, update tgbotapi.Update) {
 		return
 	}
 
-	channelName := update.Message.ForwardFromChat.UserName
-
-	fetcher, err := tools.GetFetcher(ctx, b.db, tools.GetMostFullFetcher)
+	channelID, err := tools.GetChannelID(update.Message.ForwardFromChat.ID)
 	if err != nil {
-		log.Printf("Error getting fetcher for getting channel ID to get subs of it: %v", err)
+		log.Printf("Error getting channel ID: %v", err)
 		return
 	}
 
-	requestURL := "http://" + fetcher.Ip + ":" + fetcher.Port + "/" + channelName
-	channel, err := requests.ResolveChannelName(requestURL)
-	if err != nil {
-		log.Printf("Error getting channel data from fetcher: %v", err)
-		return
-	}
+	log.Printf("Channel ID: %v", channelID)
 
-	groups, err := b.db.GetSubsOfChannel(ctx, channel.ChannelID)
+	groups, err := b.db.GetSubsOfChannel(ctx, channelID)
 	if err != nil {
 		log.Printf("Error getting subs of channel: %v", err)
 		return
 	}
 
 	for _, group := range groups {
-		b.tryUpdateChannelName(ctx, channel.ChannelID, channel.Username)
+		b.tryUpdateChannelName(ctx, channelID, update.Message.ForwardFromChat.UserName)
 		_, err := b.api.Send(tgbotapi.NewForward(group, update.Message.Chat.ID, update.Message.MessageID))
 		if err != nil {
-			log.Printf("Error sending forward from channel %v to group %v: %v", channel.ChannelID, group, err)
+			log.Printf("Error sending forward from channel %v to group %v: %v", channelID, group, err)
 		}
 	}
 }

@@ -2,9 +2,11 @@ package tools
 
 import (
 	"context"
+	"errors"
 	"github.com/BulizhnikGames/subbot/bot/db/orm"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"log"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -21,6 +23,20 @@ type AsyncMap[K comparable, V any] struct {
 }
 
 type GetFetcherRequest func(ctx context.Context, db *orm.Queries) (*FetcherParams, error)
+
+// For some reason tgbotapi package adds "-100" to all ID's of channels and supergroups, this "-100" need to be removed
+func GetChannelID(id int64) (int64, error) {
+	idStr := strconv.FormatInt(id, 10)
+	if len(idStr) <= 4 {
+		return 0, errors.New("incorrect channel id")
+	}
+	idStr, _ = strings.CutPrefix(idStr, "-100")
+	newID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	return newID, nil
+}
 
 func GetChannelUsername(username string) string {
 	if username[0] == '@' {

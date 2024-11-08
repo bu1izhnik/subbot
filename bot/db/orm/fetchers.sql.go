@@ -65,7 +65,7 @@ func (q *Queries) DeleteFetcher(ctx context.Context, id int64) error {
 }
 
 const getLeastFullFetcher = `-- name: GetLeastFullFetcher :one
-SELECT fetchers.ip, fetchers.port
+SELECT fetchers.id, fetchers.ip, fetchers.port
 FROM fetchers JOIN channels
 ON fetchers.id = channels.stored_at
 GROUP BY fetchers.id
@@ -74,6 +74,7 @@ LIMIT 1
 `
 
 type GetLeastFullFetcherRow struct {
+	ID   int64
 	Ip   string
 	Port string
 }
@@ -81,12 +82,12 @@ type GetLeastFullFetcherRow struct {
 func (q *Queries) GetLeastFullFetcher(ctx context.Context) (GetLeastFullFetcherRow, error) {
 	row := q.db.QueryRowContext(ctx, getLeastFullFetcher)
 	var i GetLeastFullFetcherRow
-	err := row.Scan(&i.Ip, &i.Port)
+	err := row.Scan(&i.ID, &i.Ip, &i.Port)
 	return i, err
 }
 
 const getMostFullFetcher = `-- name: GetMostFullFetcher :one
-SELECT fetchers.ip, fetchers.port
+SELECT fetchers.id, fetchers.ip, fetchers.port
 FROM fetchers JOIN channels
 ON fetchers.id = channels.stored_at
 GROUP BY fetchers.id
@@ -95,6 +96,7 @@ LIMIT 1
 `
 
 type GetMostFullFetcherRow struct {
+	ID   int64
 	Ip   string
 	Port string
 }
@@ -102,18 +104,19 @@ type GetMostFullFetcherRow struct {
 func (q *Queries) GetMostFullFetcher(ctx context.Context) (GetMostFullFetcherRow, error) {
 	row := q.db.QueryRowContext(ctx, getMostFullFetcher)
 	var i GetMostFullFetcherRow
-	err := row.Scan(&i.Ip, &i.Port)
+	err := row.Scan(&i.ID, &i.Ip, &i.Port)
 	return i, err
 }
 
 const getRandomFetcher = `-- name: GetRandomFetcher :one
-SELECT fetchers.ip, fetchers.port
+SELECT fetchers.id, fetchers.ip, fetchers.port
 FROM fetchers
 ORDER BY RANDOM()
 LIMIT 1
 `
 
 type GetRandomFetcherRow struct {
+	ID   int64
 	Ip   string
 	Port string
 }
@@ -121,6 +124,6 @@ type GetRandomFetcherRow struct {
 func (q *Queries) GetRandomFetcher(ctx context.Context) (GetRandomFetcherRow, error) {
 	row := q.db.QueryRowContext(ctx, getRandomFetcher)
 	var i GetRandomFetcherRow
-	err := row.Scan(&i.Ip, &i.Port)
+	err := row.Scan(&i.ID, &i.Ip, &i.Port)
 	return i, err
 }

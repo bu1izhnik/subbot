@@ -8,7 +8,8 @@ import (
 )
 
 type Config struct {
-	BotChat  int64
+	BotID    int64
+	BotHash  int64
 	APIURL   string
 	IP       string
 	Port     string
@@ -28,13 +29,21 @@ func Load() {
 func Get() Config {
 	c := Config{}
 
-	BotChatStr := os.Getenv("BOT_CHAT")
-	if BotChatStr == "" {
-		log.Fatal("Bot chat not found in .env")
+	BotIDStr := os.Getenv("BOT_ID")
+	if BotIDStr == "" {
+		log.Fatal("Bot ID not found in .env")
 	}
 	var err error
-	if c.BotChat, err = strconv.ParseInt(BotChatStr, 10, 64); err != nil {
-		log.Fatalf("Error parsing bot chat to int: %v", err)
+	if c.BotID, err = strconv.ParseInt(BotIDStr, 10, 64); err != nil {
+		log.Fatalf("Error parsing bot ID to int: %v", err)
+	}
+
+	BotHashStr := os.Getenv("BOT_HASH")
+	if BotHashStr == "" {
+		log.Fatal("Bot hash not found in .env")
+	}
+	if c.BotHash, err = strconv.ParseInt(BotHashStr, 10, 64); err != nil {
+		log.Fatalf("Error parsing bot hash to int: %v", err)
 	}
 
 	c.APIURL = os.Getenv("API_URL")

@@ -2,14 +2,13 @@ package commands
 
 import (
 	"context"
-	"encoding/json"
 	"github.com/BulizhnikGames/subbot/bot/db/orm"
 	"github.com/BulizhnikGames/subbot/bot/internal/bot"
 	"github.com/BulizhnikGames/subbot/bot/internal/commands/middleware"
+	"github.com/BulizhnikGames/subbot/bot/internal/requests"
 	"github.com/BulizhnikGames/subbot/bot/tools"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"log"
-	"net/http"
 )
 
 func delNext(db *orm.Queries) bot.Command {
@@ -34,26 +33,8 @@ func del(db *orm.Queries) bot.Command {
 		}
 
 		requestURL := "http://" + fetcherAdr.Ip + ":" + fetcherAdr.Port + "/" + channelName
-		req, err := http.NewRequest(http.MethodGet, requestURL, nil)
+		channel, err := requests.ResolveChannelName(requestURL)
 		if err != nil {
-			tools.SendWithErrorLogging(api, tgbotapi.NewMessage(groupID, "Не вышло отписаться от канала: internal error."))
-			return err
-		}
-
-		res, err := http.DefaultClient.Do(req)
-		if err != nil || res.StatusCode != http.StatusOK {
-			tools.SendWithErrorLogging(api, tgbotapi.NewMessage(groupID, "Не вышло отписаться от канала: internal error."))
-			return err
-		}
-
-		type channelData struct {
-			Username   string `json:"username"`
-			ChannelID  int64  `json:"channel_id"`
-			AccessHash int64  `json:"access_hash"`
-		}
-		decoder := json.NewDecoder(res.Body)
-		channel := channelData{}
-		if err := decoder.Decode(&channel); err != nil {
 			tools.SendWithErrorLogging(api, tgbotapi.NewMessage(groupID, "Не вышло отписаться от канала: internal error."))
 			return err
 		}

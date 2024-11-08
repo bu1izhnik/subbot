@@ -21,3 +21,8 @@ WHERE id = $1;
 SELECT channels.username FROM channels
 JOIN subs ON channels.id = subs.channel
 WHERE subs.chat = $1;
+
+-- name: ChannelAlreadyStored :one
+SELECT COUNT(1)
+FROM channels
+WHERE id = $1;

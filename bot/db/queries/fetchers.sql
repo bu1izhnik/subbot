@@ -10,7 +10,7 @@ DELETE FROM fetchers
 WHERE id = $1;
 
 -- name: GetLeastFullFetcher :one
-SELECT fetchers.ip, fetchers.port
+SELECT fetchers.id, fetchers.ip, fetchers.port
 FROM fetchers JOIN channels
 ON fetchers.id = channels.stored_at
 GROUP BY fetchers.id
@@ -18,7 +18,7 @@ ORDER BY COUNT(*) ASC
 LIMIT 1;
 
 -- name: GetMostFullFetcher :one
-SELECT fetchers.ip, fetchers.port
+SELECT fetchers.id, fetchers.ip, fetchers.port
 FROM fetchers JOIN channels
 ON fetchers.id = channels.stored_at
 GROUP BY fetchers.id
@@ -26,7 +26,7 @@ ORDER BY COUNT(*) DESC
 LIMIT 1;
 
 -- name: GetRandomFetcher :one
-SELECT fetchers.ip, fetchers.port
+SELECT fetchers.id, fetchers.ip, fetchers.port
 FROM fetchers
 ORDER BY RANDOM()
 LIMIT 1;

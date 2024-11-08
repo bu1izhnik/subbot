@@ -2,14 +2,13 @@ package commands
 
 import (
 	"context"
-	"encoding/json"
 	"github.com/BulizhnikGames/subbot/bot/db/orm"
 	"github.com/BulizhnikGames/subbot/bot/internal/bot"
 	"github.com/BulizhnikGames/subbot/bot/internal/commands/middleware"
 	"github.com/BulizhnikGames/subbot/bot/internal/config"
+	"github.com/BulizhnikGames/subbot/bot/internal/requests"
 	"github.com/BulizhnikGames/subbot/bot/tools"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"net/http"
 	"strings"
 )
 
@@ -39,6 +38,8 @@ func sub(db *orm.Queries) bot.Command {
 			return err
 		}
 
+		//TODO: firstly check if channel is already stored at some parser
+
 		var requestURL string
 		fetcherAdr, err := db.GetLeastFullFetcher(ctx)
 		if err != nil {
@@ -57,33 +58,41 @@ func sub(db *orm.Queries) bot.Command {
 			requestURL = "http://" + fetcherAdr.Ip + ":" + fetcherAdr.Port + "/" + channelName
 		}
 
-		req, err := http.NewRequest(http.MethodPost, requestURL, nil)
+		channelCheck, err := requests.ResolveChannelName(requestURL)
 		if err != nil {
 			tools.SendWithErrorLogging(api, tgbotapi.NewMessage(groupID, "Не вышло подписаться на канал: internal error."))
 			return err
 		}
 
-		res, err := http.DefaultClient.Do(req)
-		if err != nil || res.StatusCode != http.StatusCreated {
-			tools.SendWithErrorLogging(api, tgbotapi.NewMessage(groupID, "Не вышло подписаться на канал: internal error."))
-			return err
-		}
-
-		type channelData struct {
-			Username   string `json:"username"`
-			ChannelID  int64  `json:"channel_id"`
-			AccessHash int64  `json:"access_hash"`
-		}
-		decoder := json.NewDecoder(res.Body)
-		channel := channelData{}
-		if err := decoder.Decode(&channel); err != nil {
+		cnt, err := db.ChannelAlreadyStored(ctx, channelCheck.ChannelID)
+		if err != nil {
 			tools.SendWithErrorLogging(api, tgbotapi.NewMessage(groupID, "Не вышло подписаться на канал: internal error."))
 			return err
 		}
 
 		for _, ID := range channels {
-			if ID == channel.ChannelID {
+			if ID == channelCheck.ChannelID {
 				_, err = api.Send(tgbotapi.NewMessage(groupID, "Группа уже подписана на @"+channelName+"."))
+				return err
+			}
+		}
+
+		channel := channelCheck
+		if cnt == 0 {
+			channel, err = requests.SubscribeToChannel(requestURL)
+			if err != nil {
+				tools.SendWithErrorLogging(api, tgbotapi.NewMessage(groupID, "Не вышло подписаться на канал: internal error."))
+				return err
+			}
+
+			_, err = db.AddChannel(ctx, orm.AddChannelParams{
+				ID:       channel.ChannelID,
+				Hash:     channel.AccessHash,
+				Username: channel.Username,
+				StoredAt: fetcherAdr.ID,
+			})
+			if err != nil {
+				tools.SendWithErrorLogging(api, tgbotapi.NewMessage(groupID, "Не вышло подписаться на канал: internal error."))
 				return err
 			}
 		}
@@ -91,16 +100,6 @@ func sub(db *orm.Queries) bot.Command {
 		_, err = db.Subscribe(ctx, orm.SubscribeParams{
 			Chat:    update.Message.Chat.ID,
 			Channel: channel.ChannelID,
-		})
-		if err != nil {
-			tools.SendWithErrorLogging(api, tgbotapi.NewMessage(groupID, "Не вышло подписаться на канал: internal error."))
-			return err
-		}
-
-		_, err = db.AddChannel(ctx, orm.AddChannelParams{
-			ID:       channel.ChannelID,
-			Hash:     channel.AccessHash,
-			Username: channel.Username,
 		})
 		if err != nil {
 			tools.SendWithErrorLogging(api, tgbotapi.NewMessage(groupID, "Не вышло подписаться на канал: internal error."))

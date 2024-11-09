@@ -40,24 +40,29 @@ func main() {
 
 	Bot.RegisterCommand(
 		"list",
-		middleware.GroupOnly(commands.List(dbOrm)),
+		middleware.GroupOnly(
+			commands.List(dbOrm)),
 	)
 	Bot.RegisterCommand(
 		"sub",
-		middleware.AdminOnly(middleware.GroupOnly(commands.SubNext(dbOrm))),
+		middleware.AdminOnly(
+			middleware.GroupOnly(
+				commands.SubNext(dbOrm))),
 	)
 	Bot.RegisterCommand(
 		"del",
-		middleware.AdminOnly(middleware.GroupOnly(commands.DelNext(dbOrm))),
+		middleware.AdminOnly(
+			middleware.GroupOnly(
+				commands.DelNext(dbOrm))),
 	)
 	Bot.RegisterCommand(
 		"",
-		middleware.IfUserHasNext(middleware.AdminOnly(middleware.GroupOnly(middleware.GetUsersNext()))),
+		middleware.GetUsersNext(),
 	)
 
 	Bot.RegisterCallback(
 		"del",
-		middleware.IfUserHasNext(middleware.AdminOnly(middleware.GroupOnly(middleware.GetUsersNext()))),
+		middleware.GetUsersNext(),
 	)
 
 	go func() {

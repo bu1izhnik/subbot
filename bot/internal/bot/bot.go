@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/BulizhnikGames/subbot/bot/db/orm"
+	"github.com/BulizhnikGames/subbot/bot/internal/commands/middleware"
 	"github.com/BulizhnikGames/subbot/bot/tools"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"log"
@@ -11,33 +12,30 @@ import (
 	"time"
 )
 
-type Command func(ctx context.Context, api *tgbotapi.BotAPI, update tgbotapi.Update) error
-
 type Bot struct {
-	api      *tgbotapi.BotAPI
-	db       *orm.Queries
-	timeout  time.Duration
-	commands map[string]Command
-	callback map[string]Command
+	api       *tgbotapi.BotAPI
+	db        *orm.Queries
+	timeout   time.Duration
+	commands  map[string]tools.Command
+	callbacks map[string]tools.Command
 }
 
 func Init(api *tgbotapi.BotAPI, db *orm.Queries, timeout time.Duration) *Bot {
 	return &Bot{
-		api:      api,
-		db:       db,
-		timeout:  timeout,
-		commands: make(map[string]Command),
-		callback: make(map[string]Command),
+		api:       api,
+		db:        db,
+		timeout:   timeout,
+		commands:  make(map[string]tools.Command),
+		callbacks: make(map[string]tools.Command),
 	}
 }
 
-func (b *Bot) RegisterCommand(name string, command Command) {
+func (b *Bot) RegisterCommand(name string, command tools.Command) {
 	b.commands[name] = command
 }
 
-func (b *Bot) RegisterCallback(name string, callback Command) {
-	// '#' is a separator when bot receives update with callback query between its name and actual data from it
-	b.callback[name+"#"] = callback
+func (b *Bot) RegisterCallback(name string, callback tools.Command) {
+	b.callbacks[name] = middleware.CallbackOnly(callback)
 }
 
 func (b *Bot) Run() {
@@ -64,7 +62,7 @@ func (b *Bot) handleUpdate(ctx context.Context, update tgbotapi.Update) error {
 	if update.Message != nil {
 		log.Printf(
 			"message: chat id: %v, message id: %v",
-			update.Message.Chat.ID,
+			update.FromChat().ID,
 			update.Message.MessageID,
 		)
 
@@ -88,20 +86,18 @@ func (b *Bot) handleUpdate(ctx context.Context, update tgbotapi.Update) error {
 	} else if update.CallbackQuery != nil {
 		log.Printf(
 			"callback query: chat id: %v, query: %v",
-			update.CallbackQuery.Message.Chat.ID,
+			update.FromChat().ID,
 			update.CallbackQuery.Data,
 		)
 
+		// '#' is a separator when bot receives update with callback query between its name and actual data from it
 		sepIndex := strings.Index(update.CallbackQuery.Data, "#")
 		callbackCmd := update.CallbackQuery.Data[:sepIndex]
-		if cmd, ok := b.commands[callbackCmd]; ok {
+		log.Printf("%s", callbackCmd)
+		if cmd, ok := b.callbacks[callbackCmd]; ok {
 			return cmd(ctx, b.api, update)
 		} else {
-			_, err := b.api.Send(tgbotapi.NewMessage(
-				update.CallbackQuery.Message.Chat.ID,
-				"Несуществующая комманда",
-			))
-			return err
+			return tools.ResponseToCallback(b.api, update, "Несуществующая комманда")
 		}
 	}
 	return nil

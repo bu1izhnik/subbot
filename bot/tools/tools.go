@@ -22,6 +22,8 @@ type AsyncMap[K comparable, V any] struct {
 	List  map[K]V
 }
 
+type Command func(ctx context.Context, api *tgbotapi.BotAPI, update tgbotapi.Update) error
+
 type GetFetcherRequest func(ctx context.Context, db *orm.Queries) (*FetcherParams, error)
 
 // For some reason tgbotapi package adds "-100" to all ID's of channels and supergroups, this "-100" need to be removed
@@ -49,11 +51,44 @@ func GetChannelUsername(username string) string {
 	return username
 }
 
-func SendWithErrorLogging(api *tgbotapi.BotAPI, message tgbotapi.MessageConfig) {
-	message.ReplyMarkup = tgbotapi.NewRemoveKeyboard(false)
+func SendErrorMessage(api *tgbotapi.BotAPI, message tgbotapi.Chattable) {
 	_, err := api.Send(message)
 	if err != nil {
 		log.Printf("Error sending message: %v", err)
+	}
+}
+
+func ResponseToCallback(api *tgbotapi.BotAPI, update tgbotapi.Update, newText string) error {
+	if update.CallbackQuery == nil {
+		return errors.New("no callback query to response with error")
+	}
+
+	groupID := update.CallbackQuery.Message.Chat.ID
+	messageID := update.CallbackQuery.Message.MessageID
+
+	_, err := api.Send(tgbotapi.EditMessageReplyMarkupConfig{
+		BaseEdit: tgbotapi.BaseEdit{
+			ChatID:      groupID,
+			MessageID:   messageID,
+			ReplyMarkup: nil,
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	_, err = api.Send(tgbotapi.NewEditMessageText(
+		groupID,
+		messageID,
+		newText,
+	))
+	return err
+}
+
+func ResponseToCallbackLogError(api *tgbotapi.BotAPI, update tgbotapi.Update, newText string) {
+	err := ResponseToCallback(api, update, newText)
+	if err != nil {
+		log.Printf("Error responding to callback query: %v", err)
 	}
 }
 

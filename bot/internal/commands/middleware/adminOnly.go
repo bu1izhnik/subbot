@@ -2,11 +2,11 @@ package middleware
 
 import (
 	"context"
-	"github.com/BulizhnikGames/subbot/bot/internal/bot"
+	"github.com/BulizhnikGames/subbot/bot/tools"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func AdminOnly(next bot.Command) bot.Command {
+func AdminOnly(next tools.Command) tools.Command {
 	return func(ctx context.Context, api *tgbotapi.BotAPI, update tgbotapi.Update) error {
 		admins, err := api.GetChatAdministrators(
 			tgbotapi.ChatAdministratorsConfig{
@@ -25,7 +25,7 @@ func AdminOnly(next bot.Command) bot.Command {
 			}
 		}
 
-		_, err = api.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Эту комманду может использовать только админ"))
+		_, err = api.Send(tgbotapi.NewMessage(update.FromChat().ID, "Эту комманду может использовать только админ"))
 		return err
 	}
 }

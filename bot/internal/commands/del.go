@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"github.com/BulizhnikGames/subbot/bot/db/orm"
-	"github.com/BulizhnikGames/subbot/bot/internal/bot"
 	"github.com/BulizhnikGames/subbot/bot/internal/commands/middleware"
 	"github.com/BulizhnikGames/subbot/bot/internal/requests"
 	"github.com/BulizhnikGames/subbot/bot/tools"
@@ -13,35 +12,55 @@ import (
 	"strings"
 )
 
-func DelNext(db *orm.Queries) bot.Command {
+func DelNext(db *orm.Queries) tools.Command {
 	return func(ctx context.Context, api *tgbotapi.BotAPI, update tgbotapi.Update) error {
 		middleware.UserNext.Mutex.Lock()
-		middleware.UserNext.List[update.Message.From.ID] = middleware.GroupOnly(middleware.AdminOnly(del(db)))
+		//middleware.UserNext.List[update.Message.From.ID] = middleware.GroupOnly(middleware.AdminOnly(del(db)))
+		middleware.UserNext.List[update.SentFrom().ID] =
+			middleware.CallbackOnly(
+				middleware.GroupOnly(
+					middleware.AdminOnly(del(db))))
 		middleware.UserNext.Mutex.Unlock()
 
-		groupID := update.Message.Chat.ID
+		groupID := update.FromChat().ID
+
 		inlineKeyboard, err := getInlineKeyboard(ctx, db, groupID)
 		if err != nil {
-			tools.SendWithErrorLogging(api, tgbotapi.NewMessage(groupID, "Отправьте ссылку или юзернейм канала, от которого хотите отписаться."))
+			tools.SendErrorMessage(api, tgbotapi.NewMessage(groupID, "Не вышло отписаться от канала: ошибка при получении списка подписок группы."))
 			return err
 		}
 
-		msg := tgbotapi.NewMessage(groupID, "@"+update.Message.From.UserName+" отправьте ссылку или юзернейм канала, от которого хотите отписаться.")
-		inlineKeyboard.Selective = true
+		msg := tgbotapi.NewMessage(groupID, "Выберите канал, от которого хотите отписаться.")
 		msg.ReplyMarkup = inlineKeyboard
 		_, err = api.Send(msg)
 		return err
 	}
 }
 
-func del(db *orm.Queries) bot.Command {
+func del(db *orm.Queries) tools.Command {
 	return func(ctx context.Context, api *tgbotapi.BotAPI, update tgbotapi.Update) error {
-		groupID := update.Message.Chat.ID
-		channelName := tools.GetChannelUsername(update.Message.Text)
+		groupID := update.FromChat().ID
+
+		callbackData := update.CallbackData()
+		callbackData, found := strings.CutPrefix(callbackData, "del#")
+		if !found {
+			tools.ResponseToCallbackLogError(
+				api,
+				update,
+				"Не вышло отписаться от канала: internal error.",
+			)
+			return errors.New("incorrect callback data")
+		}
+
+		channelName := tools.GetChannelUsername(callbackData)
 
 		fetcher, err := tools.GetFetcher(ctx, db, tools.GetMostFullFetcher)
 		if err != nil {
-			tools.SendWithErrorLogging(api, tgbotapi.NewMessage(groupID, "Не вышло отписаться от канала: internal error."))
+			tools.ResponseToCallbackLogError(
+				api,
+				update,
+				"Не вышло отписаться от канала: internal error.",
+			)
 			return err
 		}
 
@@ -49,9 +68,17 @@ func del(db *orm.Queries) bot.Command {
 		channel, err := requests.ResolveChannelName(requestURL)
 		if err != nil {
 			if strings.Contains(err.Error(), "channel name") {
-				tools.SendWithErrorLogging(api, tgbotapi.NewMessage(groupID, "Не вышло отписаться от канала: неверное имя канала."))
+				tools.ResponseToCallbackLogError(
+					api,
+					update,
+					"Не вышло отписаться от канала: неверное имя канала.",
+				)
 			} else {
-				tools.SendWithErrorLogging(api, tgbotapi.NewMessage(groupID, "Не вышло отписаться от канала: internal error."))
+				tools.ResponseToCallbackLogError(
+					api,
+					update,
+					"Не вышло отписаться от канала: internal error.",
+				)
 			}
 			return err
 		}
@@ -65,53 +92,69 @@ func del(db *orm.Queries) bot.Command {
 			log.Printf("Error updating channel's username and hash: %v", err)
 		}
 
-		isSubed, err := db.CheckSubscription(ctx, orm.CheckSubscriptionParams{
+		/*isSubed, err := db.CheckSubscription(ctx, orm.CheckSubscriptionParams{
 			Chat:    groupID,
 			Channel: channel.ChannelID,
 		})
 		if err != nil {
-			tools.SendWithErrorLogging(api, tgbotapi.NewMessage(groupID, "Не вышло подписаться на канал: internal error."))
+			tools.SendErrorMessage(api, tgbotapi.NewMessage(groupID, "Не вышло подписаться на канал: internal error."))
 			return err
 		}
 		if isSubed == 0 {
-			tools.SendWithErrorLogging(api, tgbotapi.NewMessage(groupID, "Группа и так не подписана на @"+channel.Username))
+			tools.SendErrorMessage(api, tgbotapi.NewMessage(groupID, "Группа и так не подписана на @"+channel.Username))
 			return errors.New("incorrect request: group is not subscribed on this channel")
-		}
+		}*/
 
 		err = db.UnSubscribe(ctx, orm.UnSubscribeParams{
 			Chat:    groupID,
 			Channel: channel.ChannelID,
 		})
 		if err != nil {
-			tools.SendWithErrorLogging(api, tgbotapi.NewMessage(groupID, "Не вышло подписаться на канал: internal error."))
+			tools.ResponseToCallbackLogError(
+				api,
+				update,
+				"Не вышло отписаться от канала: internal error.",
+			)
 			return err
 		}
 
-		msg := tgbotapi.NewMessage(groupID, "Группа успешно отписалась от @"+channelName+".")
+		err = tools.ResponseToCallback(api, update, "Группа успешно отписалась от @"+channelName)
+		/*msg := tgbotapi.NewMessage(groupID, "Группа успешно отписалась от @"+channelName+".")
 		msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(false)
-		_, err = api.Send(msg)
+		_, err = api.Send(msg)*/
 		return err
 	}
 }
 
-func getInlineKeyboard(ctx context.Context, db *orm.Queries, groupID int64) (tgbotapi.ReplyKeyboardMarkup, error) {
+func getInlineKeyboard(ctx context.Context, db *orm.Queries, groupID int64) (tgbotapi.InlineKeyboardMarkup, error) {
 	channels, err := db.GetUsernamesOfGroupSubs(ctx, groupID)
 	if err != nil {
-		return tgbotapi.ReplyKeyboardMarkup{}, err
+		return tgbotapi.InlineKeyboardMarkup{}, err
 	}
 
-	rows := make([][]tgbotapi.KeyboardButton, (len(channels)-1)/2+1)
+	rows := make([][]tgbotapi.InlineKeyboardButton, (len(channels)-1)/2+1)
 	rowIndex := 0
 	for i := 0; i < len(channels); i += 2 {
 		if i == len(channels)-1 {
-			rows[rowIndex] = []tgbotapi.KeyboardButton{tgbotapi.NewKeyboardButton("@" + channels[i])}
+			rows[rowIndex] = []tgbotapi.InlineKeyboardButton{
+				tgbotapi.NewInlineKeyboardButtonData(
+					"@"+channels[i],
+					"del#"+channels[i],
+				),
+			}
 		} else {
-			rows[rowIndex] = []tgbotapi.KeyboardButton{
-				tgbotapi.NewKeyboardButton("@" + channels[i]),
-				tgbotapi.NewKeyboardButton("@" + channels[i+1]),
+			rows[rowIndex] = []tgbotapi.InlineKeyboardButton{
+				tgbotapi.NewInlineKeyboardButtonData(
+					"@"+channels[i],
+					"del#"+channels[i],
+				),
+				tgbotapi.NewInlineKeyboardButtonData(
+					"@"+channels[i+1],
+					"del#"+channels[i+1],
+				),
 			}
 		}
 		rowIndex++
 	}
-	return tgbotapi.NewReplyKeyboard(rows...), nil
+	return tgbotapi.NewInlineKeyboardMarkup(rows...), nil
 }

@@ -3,17 +3,16 @@ package commands
 import (
 	"context"
 	"github.com/BulizhnikGames/subbot/bot/db/orm"
-	"github.com/BulizhnikGames/subbot/bot/internal/bot"
 	"github.com/BulizhnikGames/subbot/bot/tools"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"strings"
 )
 
-func List(db *orm.Queries) bot.Command {
+func List(db *orm.Queries) tools.Command {
 	return func(ctx context.Context, api *tgbotapi.BotAPI, update tgbotapi.Update) error {
 		subs, err := db.GetUsernamesOfGroupSubs(ctx, update.Message.Chat.ID)
 		if err != nil {
-			tools.SendWithErrorLogging(api, tgbotapi.NewMessage(update.Message.Chat.ID, "Ошибка при получении подписок группы."))
+			tools.SendErrorMessage(api, tgbotapi.NewMessage(update.Message.Chat.ID, "Ошибка при получении подписок группы."))
 			return err
 		}
 

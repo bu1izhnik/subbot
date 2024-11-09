@@ -2,49 +2,39 @@ package middleware
 
 import (
 	"context"
-	"github.com/BulizhnikGames/subbot/bot/internal/bot"
 	"github.com/BulizhnikGames/subbot/bot/tools"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"strings"
 	"sync"
 )
 
-var UserNext tools.AsyncMap[int64, bot.Command]
+var UserNext tools.AsyncMap[int64, tools.Command]
 
 func Init() {
-	UserNext = tools.AsyncMap[int64, bot.Command]{
+	UserNext = tools.AsyncMap[int64, tools.Command]{
 		Mutex: sync.Mutex{},
-		List:  make(map[int64]bot.Command),
+		List:  make(map[int64]tools.Command),
 	}
 }
 
-func IfUserHasNext(next bot.Command) bot.Command {
+func GetUsersNext() tools.Command {
 	return func(ctx context.Context, api *tgbotapi.BotAPI, update tgbotapi.Update) error {
-		userID := update.Message.From.ID
-		UserNext.Mutex.Lock()
-		if cmd, ok := UserNext.List[userID]; ok && cmd != nil {
-			UserNext.Mutex.Unlock()
-			return next(ctx, api, update)
-		} else {
-			UserNext.Mutex.Unlock()
-			return nil
-		}
-	}
-}
+		userID := update.SentFrom().ID
 
-func GetUsersNext() bot.Command {
-	return func(ctx context.Context, api *tgbotapi.BotAPI, update tgbotapi.Update) error {
-		userID := update.Message.From.ID
 		UserNext.Mutex.Lock()
-		if command, ok := UserNext.List[userID]; ok && command != nil {
+		command, ok := UserNext.List[userID]
+		UserNext.Mutex.Unlock()
+
+		if ok && command != nil {
+			err := command(ctx, api, update)
+			if err != nil && strings.Contains(err.Error(), "not a callback") {
+				return nil
+			}
+			UserNext.Mutex.Lock()
+			UserNext.List[userID] = nil
 			UserNext.Mutex.Unlock()
-			defer func() {
-				UserNext.Mutex.Lock()
-				UserNext.List[userID] = nil
-				UserNext.Mutex.Unlock()
-			}()
-			return command(ctx, api, update)
+			return err
 		} else {
-			UserNext.Mutex.Unlock()
 			return nil
 		}
 	}

@@ -23,7 +23,7 @@ func List(db *orm.Queries) tools.Command {
 		} else {
 			builder.WriteString(fmt.Sprintf("Группа подписана на %v каналов:", len(subs)))
 			for _, sub := range subs {
-				builder.WriteString(" @")
+				builder.WriteString("\n@")
 				builder.WriteString(sub)
 			}
 		}

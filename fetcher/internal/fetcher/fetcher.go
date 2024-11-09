@@ -33,6 +33,10 @@ func Init(apiID int, apiHash string, botUsername string) (*Fetcher, error) {
 		Path: "./session.json",
 	}
 	client := telegram.NewClient(apiID, apiHash, telegram.Options{UpdateHandler: gaps, SessionStorage: &session})
+	// TODO: handle edit message
+	/*d.OnEditChannelMessage(func(ctx context.Context, e tg.Entities, update *tg.UpdateEditChannelMessage) error{
+
+	})*/
 	d.OnNewChannelMessage(func(ctx context.Context, e tg.Entities, update *tg.UpdateNewChannelMessage) error {
 		msg, ok := update.Message.(*tg.Message)
 		if !ok {
@@ -51,7 +55,7 @@ func Init(apiID int, apiHash string, botUsername string) (*Fetcher, error) {
 		// TODO: so subbot will forward this message to valid groups and send explaining message before forward:
 		// TODO: "channel @A forwarded message:"
 		if _, ok := msg.GetFwdFrom(); ok {
-			log.Printf("Message won't be forwarded, because it's already forwarded\ntext of message: %v", msg.Message)
+			log.Printf("Message won't be forwarded, because it's already forwarded")
 			return nil
 		}
 

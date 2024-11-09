@@ -49,7 +49,8 @@ func GetChannelUsername(username string) string {
 	return username
 }
 
-func SendWithErrorLogging(api *tgbotapi.BotAPI, message tgbotapi.Chattable) {
+func SendWithErrorLogging(api *tgbotapi.BotAPI, message tgbotapi.MessageConfig) {
+	message.ReplyMarkup = tgbotapi.NewRemoveKeyboard(false)
 	_, err := api.Send(message)
 	if err != nil {
 		log.Printf("Error sending message: %v", err)

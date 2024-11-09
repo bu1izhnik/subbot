@@ -4,12 +4,9 @@
     <option name="autoReloadType" value="ALL" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9e20bb0c-dde4-4ac2-8bc3-e36214860bf5" name="Changes" comment="Fixed keyboard for /del">
+    <list default="true" id="9e20bb0c-dde4-4ac2-8bc3-e36214860bf5" name="Changes" comment="Some fixes">
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/bot/cmd/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/bot/cmd/main.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/bot/internal/bot/bot.go" beforeDir="false" afterPath="$PROJECT_DIR$/bot/internal/bot/bot.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/bot/internal/commands/del.go" beforeDir="false" afterPath="$PROJECT_DIR$/bot/internal/commands/del.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/fetcher/internal/fetcher/fetcher.go" beforeDir="false" afterPath="$PROJECT_DIR$/fetcher/internal/fetcher/fetcher.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -56,24 +53,27 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;DefaultGoTemplateProperty&quot;: &quot;Go File&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.go.formatter.settings.were.checked&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.go.migrated.go.modules.settings&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.go.modules.go.list.on.any.changes.was.set&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
-    &quot;go.import.settings.migrated&quot;: &quot;true&quot;,
-    &quot;go.sdk.automatically.set&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;E:/go/subbot&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;org.jetbrains.plugins.github.ui.GithubSettingsConfigurable&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "DefaultGoTemplateProperty": "Go File",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.go.formatter.settings.were.checked": "true",
+    "RunOnceActivity.go.migrated.go.modules.settings": "true",
+    "RunOnceActivity.go.modules.go.list.on.any.changes.was.set": "true",
+    "git-widget-placeholder": "master",
+    "go.import.settings.migrated": "true",
+    "go.sdk.automatically.set": "true",
+    "last_opened_file_path": "E:/go/subbot",
+    "node.js.detected.package.eslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "preferences.keymap"
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="E:\go\subbot" />
+    </key>
     <key name="MoveFile.RECENT_KEYS">
       <recent name="E:\go\subbot\bot\internal" />
     </key>
@@ -98,7 +98,8 @@
     <MESSAGE value="fixed getting channel ID" />
     <MESSAGE value="custom reply keyboard for /del" />
     <MESSAGE value="Fixed keyboard for /del" />
-    <option name="LAST_COMMIT_MESSAGE" value="Fixed keyboard for /del" />
+    <MESSAGE value="Some fixes" />
+    <option name="LAST_COMMIT_MESSAGE" value="Some fixes" />
   </component>
   <component name="VgoProject">
     <settings-migrated>true</settings-migrated>

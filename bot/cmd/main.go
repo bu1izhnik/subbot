@@ -37,6 +37,7 @@ func main() {
 	dbOrm := orm.New(dbConn)
 
 	Bot := bot.Init(tgBotApi, dbOrm, 4*time.Second)
+
 	Bot.RegisterCommand(
 		"list",
 		middleware.GroupOnly(commands.List(dbOrm)),
@@ -53,6 +54,12 @@ func main() {
 		"",
 		middleware.IfUserHasNext(middleware.AdminOnly(middleware.GroupOnly(middleware.GetUsersNext()))),
 	)
+
+	Bot.RegisterCallback(
+		"del",
+		middleware.IfUserHasNext(middleware.AdminOnly(middleware.GroupOnly(middleware.GetUsersNext()))),
+	)
+
 	go func() {
 		Bot.Run()
 	}()

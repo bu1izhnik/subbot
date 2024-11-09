@@ -40,6 +40,21 @@ func Init(apiID int, apiHash string) (*Fetcher, error) {
 			return errors.New("unexpected message")
 		}
 
+		// If admin of channel A forwards post from channel B to his channel
+		// (Or forwards old channel from his own channel (A), but for simplicity consider first variant)
+		// All groups which are subs of channel A will get repost of B's post which will look strange
+		// Because it will show B as the channel where it posted, but group might not be subscribed to B
+		// (Technically it's correct, but group members might be confused why they get messages from random channels)
+		// Also all groups which are subs of channel B will get it's old post which will be also strange
+		// Because bot sends only new posts from each channel
+		// TODO: handle this situation by sending to subbot message containing ID and username of channel A
+		// TODO: so subbot will forward this message to valid groups and send explaining message before forward:
+		// TODO: "channel @A forwarded message:"
+		if _, ok := msg.GetFwdFrom(); ok {
+			log.Printf("Message won't be forwarded, because it's already forwarded")
+			return nil
+		}
+
 		peer, ok := msg.PeerID.(*tg.PeerChannel)
 		if !ok {
 			log.Printf("Unexpected message's peer type: %T", msg.PeerID)
@@ -107,18 +122,13 @@ func Init(apiID int, apiHash string) (*Fetcher, error) {
 
 		//log.Printf("%v, %v", botPeer.(*tg.InputPeerUser).UserID, botPeer.(*tg.InputPeerUser).AccessHash)
 
-		messageID, err := tools.GetMessageIDFromMessage(msg.String())
-		if err != nil {
-			return err
-		}
-
 		_, err = client.API().MessagesForwardMessages(ctx, &tg.MessagesForwardMessagesRequest{
 			FromPeer: &tg.InputPeerChannel{
 				ChannelID:  peer.ChannelID,
 				AccessHash: channel.AccessHash,
 			},
 			ToPeer:   botPeer,
-			ID:       []int{messageID},
+			ID:       []int{msg.ID},
 			RandomID: []int64{rand.Int63()},
 		})
 		if err != nil {

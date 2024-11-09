@@ -26,7 +26,7 @@ func DelNext(db *orm.Queries) bot.Command {
 			return err
 		}
 
-		msg := tgbotapi.NewMessage(groupID, "Отправьте ссылку или юзернейм канала, от которого хотите отписаться.")
+		msg := tgbotapi.NewMessage(groupID, "@"+update.Message.From.UserName+" отправьте ссылку или юзернейм канала, от которого хотите отписаться.")
 		inlineKeyboard.Selective = true
 		msg.ReplyMarkup = inlineKeyboard
 		_, err = api.Send(msg)

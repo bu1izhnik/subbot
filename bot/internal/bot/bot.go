@@ -2,10 +2,12 @@ package bot
 
 import (
 	"context"
+	"errors"
 	"github.com/BulizhnikGames/subbot/bot/db/orm"
 	"github.com/BulizhnikGames/subbot/bot/tools"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"log"
+	"strings"
 	"time"
 )
 
@@ -16,6 +18,7 @@ type Bot struct {
 	db       *orm.Queries
 	timeout  time.Duration
 	commands map[string]Command
+	callback map[string]Command
 }
 
 func Init(api *tgbotapi.BotAPI, db *orm.Queries, timeout time.Duration) *Bot {
@@ -24,11 +27,17 @@ func Init(api *tgbotapi.BotAPI, db *orm.Queries, timeout time.Duration) *Bot {
 		db:       db,
 		timeout:  timeout,
 		commands: make(map[string]Command),
+		callback: make(map[string]Command),
 	}
 }
 
 func (b *Bot) RegisterCommand(name string, command Command) {
 	b.commands[name] = command
+}
+
+func (b *Bot) RegisterCallback(name string, callback Command) {
+	// '#' is a separator when bot receives update with callback query between its name and actual data from it
+	b.callback[name+"#"] = callback
 }
 
 func (b *Bot) Run() {
@@ -41,61 +50,77 @@ func (b *Bot) Run() {
 	for {
 		select {
 		case update := <-updates:
-			err := b.handleUpdate(context.Background(), update)
-			if err != nil {
-				log.Printf("Error handling update: %v", err)
-			}
+			go func(update tgbotapi.Update) {
+				err := b.handleUpdate(context.Background(), update)
+				if err != nil {
+					log.Printf("Error handling update: %v", err)
+				}
+			}(update)
 		}
 	}
 }
 
 func (b *Bot) handleUpdate(ctx context.Context, update tgbotapi.Update) error {
-	if update.Message == nil {
-		return nil
-	}
+	if update.Message != nil {
+		log.Printf(
+			"message: chat id: %v, message id: %v",
+			update.Message.Chat.ID,
+			update.Message.MessageID,
+		)
 
-	log.Printf("chat id: %v, message id: %v", update.Message.Chat.ID, update.Message.MessageID)
-
-	if isFetcher, err := b.isFromFetcher(update); err != nil {
-		return err
-	} else if isFetcher {
-		go b.forwardFromFetcher(ctx, update)
-		return nil
-	}
-
-	msgCmd := update.Message.Command()
-	cmd, ok := b.commands[msgCmd]
-	if !ok {
-		_, err := b.api.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Несуществующая комманда"))
-		return err
-	}
-	go func(ctx context.Context, update tgbotapi.Update) {
-		err := cmd(ctx, b.api, update)
-		if err != nil {
-			log.Printf("Error executing user's command: %v", err)
+		if isFetcher, err := b.isFromFetcher(update); err != nil {
+			return err
+		} else if isFetcher {
+			return b.forwardFromFetcher(ctx, update)
 		}
-	}(ctx, update)
+
+		msgCmd := update.Message.Command()
+
+		if cmd, ok := b.commands[msgCmd]; ok {
+			return cmd(ctx, b.api, update)
+		} else {
+			_, err := b.api.Send(
+				tgbotapi.NewMessage(update.Message.Chat.ID,
+					"Несуществующая комманда",
+				))
+			return err
+		}
+	} else if update.CallbackQuery != nil {
+		log.Printf(
+			"callback query: chat id: %v, query: %v",
+			update.CallbackQuery.Message.Chat.ID,
+			update.CallbackQuery.Data,
+		)
+
+		sepIndex := strings.Index(update.CallbackQuery.Data, "#")
+		callbackCmd := update.CallbackQuery.Data[:sepIndex]
+		if cmd, ok := b.commands[callbackCmd]; ok {
+			return cmd(ctx, b.api, update)
+		} else {
+			_, err := b.api.Send(tgbotapi.NewMessage(
+				update.CallbackQuery.Message.Chat.ID,
+				"Несуществующая комманда",
+			))
+			return err
+		}
+	}
 	return nil
 }
 
-func (b *Bot) forwardFromFetcher(ctx context.Context, update tgbotapi.Update) {
+func (b *Bot) forwardFromFetcher(ctx context.Context, update tgbotapi.Update) error {
 	if update.Message.ForwardFromChat == nil {
-		log.Printf("Message is not a forward from channel")
-		return
+		return errors.New("message is not a forward from channel")
 	}
 
 	channelID, err := tools.GetChannelID(update.Message.ForwardFromChat.ID)
 	if err != nil {
-		log.Printf("Error getting channel ID: %v", err)
-		return
+		return err
 	}
-
 	log.Printf("Channel ID: %v", channelID)
 
 	groups, err := b.db.GetSubsOfChannel(ctx, channelID)
 	if err != nil {
-		log.Printf("Error getting subs of channel: %v", err)
-		return
+		return err
 	}
 
 	for _, group := range groups {
@@ -105,6 +130,7 @@ func (b *Bot) forwardFromFetcher(ctx context.Context, update tgbotapi.Update) {
 			log.Printf("Error sending forward from channel %v to group %v: %v", channelID, group, err)
 		}
 	}
+	return nil
 }
 
 func (b *Bot) isFromFetcher(update tgbotapi.Update) (bool, error) {

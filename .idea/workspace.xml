@@ -4,10 +4,12 @@
     <option name="autoReloadType" value="ALL" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9e20bb0c-dde4-4ac2-8bc3-e36214860bf5" name="Changes" comment="custom reply keyboard for /del">
+    <list default="true" id="9e20bb0c-dde4-4ac2-8bc3-e36214860bf5" name="Changes" comment="Fixed keyboard for /del">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/bot/cmd/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/bot/cmd/main.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/bot/internal/bot/bot.go" beforeDir="false" afterPath="$PROJECT_DIR$/bot/internal/bot/bot.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/bot/internal/commands/del.go" beforeDir="false" afterPath="$PROJECT_DIR$/bot/internal/commands/del.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/fetcher/session.json" beforeDir="false" afterPath="$PROJECT_DIR$/fetcher/session.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/fetcher/internal/fetcher/fetcher.go" beforeDir="false" afterPath="$PROJECT_DIR$/fetcher/internal/fetcher/fetcher.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -95,7 +97,8 @@
     <MESSAGE value="v1 of subbot" />
     <MESSAGE value="fixed getting channel ID" />
     <MESSAGE value="custom reply keyboard for /del" />
-    <option name="LAST_COMMIT_MESSAGE" value="custom reply keyboard for /del" />
+    <MESSAGE value="Fixed keyboard for /del" />
+    <option name="LAST_COMMIT_MESSAGE" value="Fixed keyboard for /del" />
   </component>
   <component name="VgoProject">
     <settings-migrated>true</settings-migrated>

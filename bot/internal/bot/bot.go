@@ -93,7 +93,6 @@ func (b *Bot) handleUpdate(ctx context.Context, update tgbotapi.Update) error {
 		// '#' is a separator when bot receives update with callback query between its name and actual data from it
 		sepIndex := strings.Index(update.CallbackQuery.Data, "#")
 		callbackCmd := update.CallbackQuery.Data[:sepIndex]
-		log.Printf("%s", callbackCmd)
 		if cmd, ok := b.callbacks[callbackCmd]; ok {
 			return cmd(ctx, b.api, update)
 		} else {

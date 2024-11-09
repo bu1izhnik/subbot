@@ -26,7 +26,7 @@ func List(db *orm.Queries) tools.Command {
 				builder.WriteString(sub)
 			}
 		}
-		_, err = api.Send(tgbotapi.NewMessage(update.Message.Chat.ID, builder.String()+"."))
+		_, err = api.Send(tgbotapi.NewMessage(update.Message.Chat.ID, builder.String()))
 		return err
 	}
 }

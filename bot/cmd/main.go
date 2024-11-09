@@ -15,6 +15,7 @@ import (
 )
 
 // TODO: add /help
+// TODO: improve error handling
 
 func main() {
 	config.Load()

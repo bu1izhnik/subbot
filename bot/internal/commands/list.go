@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"fmt"
 	"github.com/BulizhnikGames/subbot/bot/db/orm"
 	"github.com/BulizhnikGames/subbot/bot/tools"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -20,7 +21,7 @@ func List(db *orm.Queries) tools.Command {
 		if len(subs) == 0 {
 			builder.WriteString("Эта группа не подписана ни на один канал")
 		} else {
-			builder.WriteString("Группа подписана на:")
+			builder.WriteString(fmt.Sprintf("Группа подписана на %v каналов:", len(subs)))
 			for _, sub := range subs {
 				builder.WriteString(" @")
 				builder.WriteString(sub)

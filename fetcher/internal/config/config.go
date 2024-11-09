@@ -8,13 +8,14 @@ import (
 )
 
 type Config struct {
-	APIURL   string
-	IP       string
-	Port     string
-	Phone    string
-	Password string
-	APIID    int
-	APIHash  string
+	BotUsername string
+	APIURL      string
+	IP          string
+	Port        string
+	Phone       string
+	Password    string
+	APIID       int
+	APIHash     string
 }
 
 func Load() {
@@ -26,6 +27,11 @@ func Load() {
 
 func Get() Config {
 	c := Config{}
+
+	c.BotUsername = os.Getenv("BOT_USERNAME")
+	if c.BotUsername == "" {
+		log.Fatal("BOT_USERNAME not found in .env")
+	}
 
 	c.APIURL = os.Getenv("API_URL")
 	if c.APIURL == "" {

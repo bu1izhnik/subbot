@@ -24,7 +24,7 @@ type Fetcher struct {
 	gaps   *updates.Manager
 }
 
-func Init(apiID int, apiHash string) (*Fetcher, error) {
+func Init(apiID int, apiHash string, botUsername string) (*Fetcher, error) {
 	d := tg.NewUpdateDispatcher()
 	gaps := updates.New(updates.Config{
 		Handler: d,
@@ -51,7 +51,7 @@ func Init(apiID int, apiHash string) (*Fetcher, error) {
 		// TODO: so subbot will forward this message to valid groups and send explaining message before forward:
 		// TODO: "channel @A forwarded message:"
 		if _, ok := msg.GetFwdFrom(); ok {
-			log.Printf("Message won't be forwarded, because it's already forwarded")
+			log.Printf("Message won't be forwarded, because it's already forwarded\ntext of message: %v", msg.Message)
 			return nil
 		}
 
@@ -101,7 +101,7 @@ func Init(apiID int, apiHash string) (*Fetcher, error) {
 
 		log.Printf("%v, %v \n %v, %v", peer.ChannelID, channel.AccessHash, bot.ID)*/
 
-		resolved, err := client.API().ContactsResolveUsername(ctx, "stonesubbot")
+		resolved, err := client.API().ContactsResolveUsername(ctx, botUsername)
 		if err != nil {
 			log.Printf("failed to resolve username: %v", err)
 			return err

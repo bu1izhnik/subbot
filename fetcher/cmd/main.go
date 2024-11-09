@@ -11,7 +11,7 @@ func main() {
 	config.Load()
 	cfg := config.Get()
 
-	f, err := fetcher.Init(cfg.APIID, cfg.APIHash)
+	f, err := fetcher.Init(cfg.APIID, cfg.APIHash, cfg.BotUsername)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/BulizhnikGames/subbot/bot/internal/requests"
 	"github.com/BulizhnikGames/subbot/bot/tools"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"strings"
 )
 
 func SubNext(db *orm.Queries) bot.Command {
@@ -46,7 +47,11 @@ func sub(db *orm.Queries) bot.Command {
 		requestURL := "http://" + fetcher.Ip + ":" + fetcher.Port + "/" + channelName
 		channelCheck, err := requests.ResolveChannelName(requestURL)
 		if err != nil {
-			tools.SendWithErrorLogging(api, tgbotapi.NewMessage(groupID, "Не вышло подписаться на канал: internal error."))
+			if strings.Contains(err.Error(), "channel name") {
+				tools.SendWithErrorLogging(api, tgbotapi.NewMessage(groupID, "Не вышло подписаться на канал: неверное имя канала."))
+			} else {
+				tools.SendWithErrorLogging(api, tgbotapi.NewMessage(groupID, "Не вышло подписаться на канал: internal error."))
+			}
 			return err
 		}
 

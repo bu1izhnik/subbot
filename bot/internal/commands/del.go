@@ -10,6 +10,7 @@ import (
 	"github.com/BulizhnikGames/subbot/bot/tools"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"log"
+	"strings"
 )
 
 func DelNext(db *orm.Queries) bot.Command {
@@ -26,6 +27,7 @@ func DelNext(db *orm.Queries) bot.Command {
 		}
 
 		msg := tgbotapi.NewMessage(groupID, "Отправьте ссылку или юзернейм канала, от которого хотите отписаться.")
+		inlineKeyboard.Selective = true
 		msg.ReplyMarkup = inlineKeyboard
 		_, err = api.Send(msg)
 		return err
@@ -46,7 +48,11 @@ func del(db *orm.Queries) bot.Command {
 		requestURL := "http://" + fetcher.Ip + ":" + fetcher.Port + "/" + channelName
 		channel, err := requests.ResolveChannelName(requestURL)
 		if err != nil {
-			tools.SendWithErrorLogging(api, tgbotapi.NewMessage(groupID, "Не вышло отписаться от канала: internal error."))
+			if strings.Contains(err.Error(), "channel name") {
+				tools.SendWithErrorLogging(api, tgbotapi.NewMessage(groupID, "Не вышло отписаться от канала: неверное имя канала."))
+			} else {
+				tools.SendWithErrorLogging(api, tgbotapi.NewMessage(groupID, "Не вышло отписаться от канала: internal error."))
+			}
 			return err
 		}
 

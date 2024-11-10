@@ -20,11 +20,18 @@ import (
 )
 
 type Fetcher struct {
-	client *telegram.Client
-	gaps   *updates.Manager
+	client  *telegram.Client
+	gaps    *updates.Manager
+	botID   int64
+	botHash int64
 }
 
 func Init(apiID int, apiHash string, botUsername string) (*Fetcher, error) {
+	f := &Fetcher{
+		botID:   0,
+		botHash: 0,
+	}
+
 	d := tg.NewUpdateDispatcher()
 	gaps := updates.New(updates.Config{
 		Handler: d,
@@ -105,23 +112,32 @@ func Init(apiID int, apiHash string, botUsername string) (*Fetcher, error) {
 
 		log.Printf("%v, %v \n %v, %v", peer.ChannelID, channel.AccessHash, bot.ID)*/
 
-		resolved, err := client.API().ContactsResolveUsername(ctx, botUsername)
-		if err != nil {
-			log.Printf("failed to resolve username: %v", err)
-			return err
-		}
-
 		var botPeer tg.InputPeerClass
-		if len(resolved.Users) > 0 {
-			user := resolved.Users[0]
-			if u, ok := user.(*tg.User); ok {
-				botPeer = &tg.InputPeerUser{
-					UserID:     u.ID,
-					AccessHash: u.AccessHash,
+		if f.botID == 0 || f.botHash == 0 {
+			resolved, err := client.API().ContactsResolveUsername(ctx, botUsername)
+			if err != nil {
+				log.Printf("failed to resolve username: %v", err)
+				return err
+			}
+
+			if len(resolved.Users) > 0 {
+				user := resolved.Users[0]
+				if u, ok := user.(*tg.User); ok {
+					botPeer = &tg.InputPeerUser{
+						UserID:     u.ID,
+						AccessHash: u.AccessHash,
+					}
+					f.botID = u.ID
+					f.botHash = u.AccessHash
 				}
+			} else {
+				return fmt.Errorf("could not resolve bot username")
 			}
 		} else {
-			return fmt.Errorf("could not resolve bot username")
+			botPeer = &tg.InputPeerUser{
+				UserID:     f.botID,
+				AccessHash: f.botHash,
+			}
 		}
 
 		//log.Printf("%v, %v", botPeer.(*tg.InputPeerUser).UserID, botPeer.(*tg.InputPeerUser).AccessHash)
@@ -141,10 +157,9 @@ func Init(apiID int, apiHash string, botUsername string) (*Fetcher, error) {
 		return err
 	})
 
-	return &Fetcher{
-		client: client,
-		gaps:   gaps,
-	}, nil
+	f.client = client
+	f.gaps = gaps
+	return f, nil
 }
 
 func (f *Fetcher) Run(phone string, password string, apiURL string, IP string, port string) error {

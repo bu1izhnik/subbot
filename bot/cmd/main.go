@@ -16,6 +16,8 @@ import (
 
 // TODO: add /help
 // TODO: improve error handling
+// TODO: rate limit users
+// TODO: handle edit and forwarded posts
 
 func main() {
 	config.Load()

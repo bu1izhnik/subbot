@@ -60,11 +60,6 @@ func (b *Bot) Run() {
 
 func (b *Bot) handleUpdate(ctx context.Context, update tgbotapi.Update) error {
 	if update.Message != nil {
-		log.Printf(
-			"message: chat id: %v, message id: %v",
-			update.FromChat().ID,
-			update.Message.MessageID,
-		)
 
 		if isFetcher, err := b.isFromFetcher(update); err != nil {
 			return err
@@ -73,6 +68,15 @@ func (b *Bot) handleUpdate(ctx context.Context, update tgbotapi.Update) error {
 		}
 
 		msgCmd := update.Message.Command()
+
+		if msgCmd == "" {
+			log.Printf(
+				"message: chat id: %v, message id: %v, cmd: %s",
+				update.FromChat().ID,
+				update.Message.MessageID,
+				msgCmd,
+			)
+		}
 
 		if cmd, ok := b.commands[msgCmd]; ok {
 			return cmd(ctx, b.api, update)

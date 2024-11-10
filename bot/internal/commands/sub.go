@@ -15,7 +15,8 @@ import (
 func SubNext(db *orm.Queries) tools.Command {
 	return func(ctx context.Context, api *tgbotapi.BotAPI, update tgbotapi.Update) error {
 		middleware.UserNext.Mutex.Lock()
-		middleware.UserNext.List[update.Message.From.ID] = middleware.GroupOnly(middleware.AdminOnly(sub(db)))
+		middleware.UserNext.List[update.Message.From.ID] = middleware.GroupOnly(
+			middleware.AdminOnly(sub(db)))
 		middleware.UserNext.Mutex.Unlock()
 		_, err := api.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Отправьте ссылку или юзернейм канала, на который надо подписаться."))
 		return err

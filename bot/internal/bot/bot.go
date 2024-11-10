@@ -69,7 +69,7 @@ func (b *Bot) handleUpdate(ctx context.Context, update tgbotapi.Update) error {
 
 		msgCmd := update.Message.Command()
 
-		if msgCmd == "" {
+		if msgCmd != "" {
 			log.Printf(
 				"message: chat id: %v, message id: %v, cmd: %s",
 				update.FromChat().ID,

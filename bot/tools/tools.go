@@ -41,6 +41,9 @@ func GetChannelID(id int64) (int64, error) {
 }
 
 func GetChannelUsername(username string) string {
+	if username == "" {
+		return ""
+	}
 	if username[0] == '@' {
 		return username[1:]
 	} else if strings.HasPrefix(username, "t.me/") {

@@ -59,14 +59,17 @@ func (b *Bot) Run() {
 }
 
 func (b *Bot) handleUpdate(ctx context.Context, update tgbotapi.Update) error {
+	if update.SentFrom() == nil {
+		return nil
+	}
+
+	if isFetcher, err := b.isFromFetcher(update); err != nil {
+		return err
+	} else if isFetcher {
+		return b.forwardFromFetcher(ctx, update)
+	}
+
 	if update.Message != nil {
-
-		if isFetcher, err := b.isFromFetcher(update); err != nil {
-			return err
-		} else if isFetcher {
-			return b.forwardFromFetcher(ctx, update)
-		}
-
 		msgCmd := update.Message.Command()
 
 		if msgCmd != "" {
@@ -133,17 +136,11 @@ func (b *Bot) forwardFromFetcher(ctx context.Context, update tgbotapi.Update) er
 }
 
 func (b *Bot) isFromFetcher(update tgbotapi.Update) (bool, error) {
-	if update.Message.Text == "" {
-		return false, nil
-	}
-	isFetcher, err := b.db.CheckFetcher(context.Background(), update.Message.From.ID)
+	isFetcher, err := b.db.CheckFetcher(context.Background(), update.SentFrom().ID)
 	if err != nil {
 		return false, err
 	}
-	if isFetcher == 1 {
-		return true, nil
-	}
-	return false, nil
+	return isFetcher == 1, nil
 }
 
 func (b *Bot) tryUpdateChannelName(ctx context.Context, channelID int64, channelName string) {

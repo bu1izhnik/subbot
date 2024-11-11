@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/BulizhnikGames/subbot/fetcher/tools"
 	"github.com/gotd/td/telegram"
 	"github.com/gotd/td/telegram/auth"
 	"github.com/gotd/td/telegram/updates"
@@ -20,12 +19,17 @@ import (
 	"time"
 )
 
-// TODO: auto silent notifications
+type forwardConfig struct {
+	channelID  int64
+	accessHash int64
+	messageID  int
+}
 
 type Fetcher struct {
 	client      *telegram.Client
 	gaps        *updates.Manager
-	forwardChan chan tg.MessagesForwardMessagesRequest
+	forwardChan chan *forwardConfig
+	botUsername string
 	botID       int64
 	botHash     int64
 }
@@ -34,7 +38,8 @@ func Init(apiID int, apiHash string, botUsername string) (*Fetcher, error) {
 	f := &Fetcher{
 		botID:       0,
 		botHash:     0,
-		forwardChan: make(chan tg.MessagesForwardMessagesRequest, 200),
+		botUsername: botUsername,
+		forwardChan: make(chan *forwardConfig, 1000),
 	}
 
 	d := tg.NewUpdateDispatcher()
@@ -84,7 +89,7 @@ func Init(apiID int, apiHash string, botUsername string) (*Fetcher, error) {
 			},
 		})
 		if err != nil {
-			log.Printf("Error getting channels access hash: %v", err)
+			log.Printf("Error getting channels (%v) access hash: %v", peer.ChannelID, err)
 			return err
 		}
 		channelData, ok := getChannel.(*tg.MessagesChats)
@@ -117,44 +122,12 @@ func Init(apiID int, apiHash string, botUsername string) (*Fetcher, error) {
 
 		log.Printf("%v, %v \n %v, %v", peer.ChannelID, channel.AccessHash, bot.ID)*/
 
-		var botPeer tg.InputPeerClass
-		if f.botID == 0 || f.botHash == 0 {
-			resolved, err := client.API().ContactsResolveUsername(ctx, botUsername)
-			if err != nil {
-				log.Printf("failed to resolve username: %v", err)
-				return err
-			}
-
-			if len(resolved.Users) > 0 {
-				user := resolved.Users[0]
-				if u, ok := user.(*tg.User); ok {
-					botPeer = &tg.InputPeerUser{
-						UserID:     u.ID,
-						AccessHash: u.AccessHash,
-					}
-					f.botID = u.ID
-					f.botHash = u.AccessHash
-				}
-			} else {
-				return fmt.Errorf("could not resolve bot username")
-			}
-		} else {
-			botPeer = &tg.InputPeerUser{
-				UserID:     f.botID,
-				AccessHash: f.botHash,
-			}
-		}
-
 		//log.Printf("%v, %v", botPeer.(*tg.InputPeerUser).UserID, botPeer.(*tg.InputPeerUser).AccessHash)
 
-		f.forwardChan <- tg.MessagesForwardMessagesRequest{
-			FromPeer: &tg.InputPeerChannel{
-				ChannelID:  peer.ChannelID,
-				AccessHash: channel.AccessHash,
-			},
-			ToPeer:   botPeer,
-			ID:       []int{msg.ID},
-			RandomID: []int64{rand.Int63()},
+		f.forwardChan <- &forwardConfig{
+			channelID:  channel.ID,
+			accessHash: channel.AccessHash,
+			messageID:  msg.ID,
 		}
 
 		return nil
@@ -166,7 +139,7 @@ func Init(apiID int, apiHash string, botUsername string) (*Fetcher, error) {
 }
 
 func (f *Fetcher) Run(phone string, password string, apiURL string, IP string, port string) error {
-	go f.tick(context.Background(), 1500*time.Millisecond)
+	go f.tick(context.Background(), 500*time.Millisecond)
 
 	codePrompt := func(ctx context.Context, sentCode *tg.AuthSentCode) (string, error) {
 		log.Print("Enter code: ")
@@ -233,22 +206,58 @@ func (f *Fetcher) GetChannelInfo(ctx context.Context, channelName string) (int64
 	if err != nil {
 		return 0, 0, err
 	}
-	channelID, err := tools.GetChannelIDFromChannel(res.Chats[0].String())
-	if err != nil {
-		return 0, 0, err
+	if len(res.Chats) == 0 {
+		return 0, 0, errors.New("not a channel: got 0 chats by resolving")
 	}
-	accessHash, err := tools.GetAccessHashFromChannel(res.Chats[0].String())
-	if err != nil {
-		return 0, 0, err
+	if channel, ok := res.Chats[0].(*tg.Channel); ok {
+		return channel.ID, channel.AccessHash, nil
+	} else {
+		return 0, 0, errors.New(fmt.Sprintf("not a channel: invalid chat type (%T)", res.Chats[0]))
 	}
-	return channelID, accessHash, err
 }
 
 func (f *Fetcher) tick(ctx context.Context, interval time.Duration) {
 	for {
 		select {
 		case forward := <-f.forwardChan:
-			_, err := f.client.API().MessagesForwardMessages(ctx, &forward)
+			var botPeer tg.InputPeerClass
+			if f.botID == 0 || f.botHash == 0 {
+				resolved, err := f.client.API().ContactsResolveUsername(ctx, f.botUsername)
+				if err != nil {
+					log.Printf("failed to resolve username of bot (%v) to foward message: %v", f.botUsername, err)
+				}
+
+				if len(resolved.Users) > 0 {
+					user := resolved.Users[0]
+					if u, ok := user.(*tg.User); ok {
+						botPeer = &tg.InputPeerUser{
+							UserID:     u.ID,
+							AccessHash: u.AccessHash,
+						}
+						f.botID = u.ID
+						f.botHash = u.AccessHash
+					} else {
+						log.Printf("failed to resolve username of bot (%v): not a user", f.botUsername)
+					}
+				} else {
+					log.Printf("failed to resolve username of bot (%v): resolving returned 0 users", f.botUsername)
+				}
+			} else {
+				botPeer = &tg.InputPeerUser{
+					UserID:     f.botID,
+					AccessHash: f.botHash,
+				}
+			}
+
+			_, err := f.client.API().MessagesForwardMessages(ctx, &tg.MessagesForwardMessagesRequest{
+				FromPeer: &tg.InputPeerChannel{
+					ChannelID:  forward.channelID,
+					AccessHash: forward.accessHash,
+				},
+				ToPeer:   botPeer,
+				ID:       []int{forward.messageID},
+				RandomID: []int64{rand.Int63()},
+			})
 			if err != nil {
 				log.Printf("Error forwarding messages: %v", err)
 			}

@@ -17,19 +17,24 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
+// TODO: auto silent notifications
+
 type Fetcher struct {
-	client  *telegram.Client
-	gaps    *updates.Manager
-	botID   int64
-	botHash int64
+	client      *telegram.Client
+	gaps        *updates.Manager
+	forwardChan chan tg.MessagesForwardMessagesRequest
+	botID       int64
+	botHash     int64
 }
 
 func Init(apiID int, apiHash string, botUsername string) (*Fetcher, error) {
 	f := &Fetcher{
-		botID:   0,
-		botHash: 0,
+		botID:       0,
+		botHash:     0,
+		forwardChan: make(chan tg.MessagesForwardMessagesRequest, 200),
 	}
 
 	d := tg.NewUpdateDispatcher()
@@ -142,7 +147,7 @@ func Init(apiID int, apiHash string, botUsername string) (*Fetcher, error) {
 
 		//log.Printf("%v, %v", botPeer.(*tg.InputPeerUser).UserID, botPeer.(*tg.InputPeerUser).AccessHash)
 
-		_, err = client.API().MessagesForwardMessages(ctx, &tg.MessagesForwardMessagesRequest{
+		f.forwardChan <- tg.MessagesForwardMessagesRequest{
 			FromPeer: &tg.InputPeerChannel{
 				ChannelID:  peer.ChannelID,
 				AccessHash: channel.AccessHash,
@@ -150,11 +155,9 @@ func Init(apiID int, apiHash string, botUsername string) (*Fetcher, error) {
 			ToPeer:   botPeer,
 			ID:       []int{msg.ID},
 			RandomID: []int64{rand.Int63()},
-		})
-		if err != nil {
-			log.Printf("Error forwarding messages: %v", err)
 		}
-		return err
+
+		return nil
 	})
 
 	f.client = client
@@ -163,6 +166,8 @@ func Init(apiID int, apiHash string, botUsername string) (*Fetcher, error) {
 }
 
 func (f *Fetcher) Run(phone string, password string, apiURL string, IP string, port string) error {
+	go f.tick(context.Background(), 1500*time.Millisecond)
+
 	codePrompt := func(ctx context.Context, sentCode *tg.AuthSentCode) (string, error) {
 		log.Print("Enter code: ")
 		code, err := bufio.NewReader(os.Stdin).ReadString('\n')
@@ -237,4 +242,19 @@ func (f *Fetcher) GetChannelInfo(ctx context.Context, channelName string) (int64
 		return 0, 0, err
 	}
 	return channelID, accessHash, err
+}
+
+func (f *Fetcher) tick(ctx context.Context, interval time.Duration) {
+	for {
+		select {
+		case forward := <-f.forwardChan:
+			_, err := f.client.API().MessagesForwardMessages(ctx, &forward)
+			if err != nil {
+				log.Printf("Error forwarding messages: %v", err)
+			}
+		case <-ctx.Done():
+			return
+		}
+		time.Sleep(interval)
+	}
 }

@@ -54,6 +54,21 @@ func (q *Queries) GetSubsOfChannel(ctx context.Context, channel int64) ([]int64,
 	return items, nil
 }
 
+const groupIDChanged = `-- name: GroupIDChanged :exec
+UPDATE subs SET chat = $2
+WHERE chat = $1
+`
+
+type GroupIDChangedParams struct {
+	Chat   int64
+	Chat_2 int64
+}
+
+func (q *Queries) GroupIDChanged(ctx context.Context, arg GroupIDChangedParams) error {
+	_, err := q.db.ExecContext(ctx, groupIDChanged, arg.Chat, arg.Chat_2)
+	return err
+}
+
 const listGroupSubs = `-- name: ListGroupSubs :many
 SELECT channel FROM subs
 WHERE chat = $1

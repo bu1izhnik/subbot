@@ -17,7 +17,7 @@ import (
 // TODO: add /help
 // TODO: improve error handling
 // TODO: rate limit users
-// TODO: handle edit and forwarded posts
+// TODO: improve error handling from fetcher's API
 
 func main() {
 	config.Load()
@@ -39,7 +39,7 @@ func main() {
 
 	dbOrm := orm.New(dbConn)
 
-	Bot := bot.Init(tgBotApi, dbOrm, 4*time.Second)
+	Bot := bot.Init(tgBotApi, dbOrm, 4*time.Second, 30*time.Minute)
 
 	Bot.RegisterCommand(
 		"list",

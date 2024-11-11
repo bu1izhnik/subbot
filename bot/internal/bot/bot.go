@@ -9,24 +9,49 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"log"
 	"strings"
+	"sync"
 	"time"
 )
+
+// key is message which was reposted and value is channels to which it was reposted
+type channelReposts struct {
+	reposts map[tools.MessageConfig][]tools.RepostedTo
+	mutex   sync.Mutex
+}
+
+// key is message which was edited, value is username of channel
+type channelEdit struct {
+	edits map[tools.MessageConfig]string
+	mutex sync.Mutex
+}
 
 type Bot struct {
 	api       *tgbotapi.BotAPI
 	db        *orm.Queries
-	timeout   time.Duration
 	commands  map[string]tools.Command
 	callbacks map[string]tools.Command
+	channelReposts
+	channelEdit
+	timeout       time.Duration
+	removeGarbage <-chan time.Time
 }
 
-func Init(api *tgbotapi.BotAPI, db *orm.Queries, timeout time.Duration) *Bot {
+func Init(api *tgbotapi.BotAPI, db *orm.Queries, timeout time.Duration, garbageTimeout time.Duration) *Bot {
 	return &Bot{
 		api:       api,
 		db:        db,
-		timeout:   timeout,
 		commands:  make(map[string]tools.Command),
 		callbacks: make(map[string]tools.Command),
+		channelReposts: channelReposts{
+			reposts: make(map[tools.MessageConfig][]tools.RepostedTo),
+			mutex:   sync.Mutex{},
+		},
+		channelEdit: channelEdit{
+			edits: make(map[tools.MessageConfig]string),
+			mutex: sync.Mutex{},
+		},
+		removeGarbage: time.NewTicker(garbageTimeout).C,
+		timeout:       timeout,
 	}
 }
 
@@ -47,6 +72,8 @@ func (b *Bot) Run() {
 
 	for {
 		select {
+		case <-b.removeGarbage:
+			go b.removeGarbageData()
 		case update := <-updates:
 			go func(update tgbotapi.Update) {
 				err := b.handleUpdate(context.Background(), update)
@@ -59,6 +86,14 @@ func (b *Bot) Run() {
 }
 
 func (b *Bot) handleUpdate(ctx context.Context, update tgbotapi.Update) error {
+	if update.FromChat() != nil && update.Message != nil && update.Message.MigrateFromChatID != 0 {
+		log.Printf("migrate from: %v, to: %v", update.Message.MigrateFromChatID, update.FromChat().ID)
+		return b.db.GroupIDChanged(ctx, orm.GroupIDChangedParams{
+			update.Message.MigrateFromChatID,
+			update.FromChat().ID,
+		})
+	}
+
 	if update.SentFrom() == nil {
 		return nil
 	}
@@ -66,7 +101,7 @@ func (b *Bot) handleUpdate(ctx context.Context, update tgbotapi.Update) error {
 	if isFetcher, err := b.isFromFetcher(update); err != nil {
 		return err
 	} else if isFetcher {
-		return b.forwardFromFetcher(ctx, update)
+		return b.handleFromFetcher(ctx, update)
 	}
 
 	if update.Message != nil {
@@ -109,18 +144,135 @@ func (b *Bot) handleUpdate(ctx context.Context, update tgbotapi.Update) error {
 	return nil
 }
 
-func (b *Bot) forwardFromFetcher(ctx context.Context, update tgbotapi.Update) error {
+func (b *Bot) handleFromFetcher(ctx context.Context, update tgbotapi.Update) error {
+	if update.Message == nil {
+		return errors.New("message is not from fetcher: message empty")
+	}
+
 	if update.Message.ForwardFromChat == nil {
-		return errors.New("message is not a forward from channel")
+		if len(update.Message.Text) > 2 {
+			if update.Message.Text[0] == 'r' { // got repost message config (ex: "r cID1 mID2 cID3 username")
+				cfg, rep, err := tools.GetValuesFromRepostConfig(update.Message.Text[2:])
+				if err != nil {
+					return err
+				}
+				b.channelReposts.mutex.Lock()
+				if b.channelReposts.reposts[*cfg] == nil {
+					b.channelReposts.reposts[*cfg] = make([]tools.RepostedTo, 0)
+				}
+				b.channelReposts.reposts[*cfg] = append(b.channelReposts.reposts[*cfg], *rep)
+				//log.Printf("added to reposts from: %+v to: %+v (%v)", *cfg, *rep, len(b.channelReposts.reposts[*cfg]))
+				b.channelReposts.mutex.Unlock()
+				return nil
+			} else if update.Message.Text[0] == 'e' { // got edit message config (ex: "e cID1 mID2 username")
+				cfg, channelName, err := tools.GetValuesFromEditConfig(update.Message.Text[2:])
+				if err != nil {
+					return err
+				}
+				b.channelEdit.mutex.Lock()
+				b.channelEdit.edits[*cfg] = channelName
+				b.channelEdit.mutex.Unlock()
+				//log.Printf("setted edit: %+v = %s", *cfg, channelName)
+				return nil
+			} else {
+				return errors.New("message is not from fetcher: incorrect code in the beginning")
+			}
+		} else {
+			return errors.New("message is not from fetcher: not forwarded and text length <= 2")
+		}
 	}
 
 	channelID, err := tools.GetChannelID(update.Message.ForwardFromChat.ID)
 	if err != nil {
 		return err
 	}
-	log.Printf("Channel ID: %v", channelID)
+	log.Printf("Channel: ID: %v, Name: %s", channelID, update.Message.ForwardFromChat.UserName)
 
-	groups, err := b.db.GetSubsOfChannel(ctx, channelID)
+	messageID := update.Message.ForwardFromMessageID
+	msgCfg := tools.MessageConfig{
+		ChannelID: channelID,
+		MessageID: messageID,
+	}
+
+	//log.Printf("Possible message cfg: %+v", msgCfg)
+
+	var groups []int64
+	var wasRepostOrEdit bool
+
+	b.channelEdit.mutex.Lock()
+	if channelName, ok := b.channelEdit.edits[msgCfg]; ok {
+		delete(b.channelEdit.edits, msgCfg)
+		b.channelEdit.mutex.Unlock()
+
+		wasRepostOrEdit = true
+
+		groups, err = b.db.GetSubsOfChannel(ctx, channelID)
+		if err != nil {
+			return err
+		}
+
+		for _, group := range groups {
+			_, err = b.api.Send(tgbotapi.NewMessage(group, "@"+channelName+" отредактировал сообщение:"))
+			if err != nil {
+				log.Printf("Error sending edited post from channel %v to group %v: %v", channelID, group, err)
+				continue
+			}
+
+			_, err = b.api.Send(tgbotapi.NewForward(group, update.Message.Chat.ID, update.Message.MessageID))
+			if err != nil {
+				log.Printf("Error sending edited post from channel %v to group %v: %v", channelID, group, err)
+			}
+		}
+	} else {
+		b.channelEdit.mutex.Unlock()
+	}
+
+	//log.Printf("map: %+v", b.channelReposts.reposts)
+
+	b.channelReposts.mutex.Lock()
+	if targets, ok := b.channelReposts.reposts[msgCfg]; ok {
+		delete(b.channelReposts.reposts, msgCfg)
+		b.channelReposts.mutex.Unlock()
+
+		wasRepostOrEdit = true
+
+		//log.Printf("targets: %+v", targets)
+
+		for _, target := range targets {
+			groups, err = b.db.GetSubsOfChannel(ctx, target.ChannelID)
+			if err != nil {
+				log.Printf(
+					"Could not repost message from channel %v, to channel (%v, %s): %v",
+					channelID,
+					target.ChannelID,
+					target.ChannelName,
+					err,
+				)
+				continue
+			}
+
+			for _, group := range groups {
+				_, err = b.api.Send(tgbotapi.NewMessage(group, "@"+target.ChannelName+" переслал сообщение:"))
+				if err != nil {
+					log.Printf("Error sending repost from channel %v to group %v: %v", channelID, group, err)
+					continue
+				}
+
+				_, err = b.api.Send(tgbotapi.NewForward(group, update.Message.Chat.ID, update.Message.MessageID))
+				if err != nil {
+					log.Printf("Error sending repost from channel %v to group %v: %v", channelID, group, err)
+				}
+			}
+		}
+	} else {
+		b.channelReposts.mutex.Unlock()
+	}
+
+	if wasRepostOrEdit {
+		return nil
+	}
+
+	groups, err = b.db.GetSubsOfChannel(ctx, channelID)
 	if err != nil {
 		return err
 	}
@@ -150,4 +302,14 @@ func (b *Bot) tryUpdateChannelName(ctx context.Context, channelID int64, channel
 	}); err != nil {
 		log.Printf("Error changing channel (%v) name to %v: %v", channelID, channelName, err)
 	}
+}
+
+func (b *Bot) removeGarbageData() {
+	b.channelReposts.mutex.Lock()
+	b.channelReposts.reposts = make(map[tools.MessageConfig][]tools.RepostedTo)
+	b.channelReposts.mutex.Unlock()
+
+	b.channelEdit.mutex.Lock()
+	b.channelEdit.edits = make(map[tools.MessageConfig]string)
+	b.channelEdit.mutex.Unlock()
 }

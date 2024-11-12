@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"github.com/BulizhnikGames/subbot/bot/db/orm"
-	"github.com/BulizhnikGames/subbot/bot/internal/commands/middleware"
 	"github.com/BulizhnikGames/subbot/bot/tools"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"log"
@@ -60,7 +59,7 @@ func (b *Bot) RegisterCommand(name string, command tools.Command) {
 }
 
 func (b *Bot) RegisterCallback(name string, callback tools.Command) {
-	b.callbacks[name] = middleware.CallbackOnly(callback)
+	b.callbacks[name] = callback
 }
 
 func (b *Bot) Run() {
@@ -109,9 +108,10 @@ func (b *Bot) handleUpdate(ctx context.Context, update tgbotapi.Update) error {
 
 		if msgCmd != "" {
 			log.Printf(
-				"message: chat id: %v, message id: %v, cmd: %s",
+				"message: chat id: %v, message id: %v, username: %s, cmd: %s",
 				update.FromChat().ID,
 				update.Message.MessageID,
+				update.SentFrom().UserName,
 				msgCmd,
 			)
 		}
@@ -149,7 +149,11 @@ func (b *Bot) handleFromFetcher(ctx context.Context, update tgbotapi.Update) err
 		return errors.New("message is not from fetcher: message empty")
 	}
 
-	if update.Message.ForwardFromChat == nil {
+	/*if update.Message.ForwardFrom != nil {
+		log.Printf("%+v\n%+v\n%v", update.Message.ForwardFrom, update.Message, update.Message.ForwardFromMessageID)
+	}*/
+
+	if update.Message.ForwardFromChat == nil && update.Message.ForwardFrom == nil {
 		if len(update.Message.Text) > 2 {
 			if update.Message.Text[0] == 'r' { // got repost message config (ex: "r cID1 mID2 cID3 username")
 				cfg, rep, err := tools.GetValuesFromRepostConfig(update.Message.Text[2:])
@@ -182,19 +186,24 @@ func (b *Bot) handleFromFetcher(ctx context.Context, update tgbotapi.Update) err
 		}
 	}
 
-	channelID, err := tools.GetChannelID(update.Message.ForwardFromChat.ID)
-	if err != nil {
-		return err
+	var chatID int64
+	var err error
+	if update.Message.ForwardFromChat != nil {
+		chatID, err = tools.GetChannelID(update.Message.ForwardFromChat.ID)
+		if err != nil {
+			return err
+		}
+		log.Printf("Channel: ID: %v, Name: %s", chatID, update.Message.ForwardFromChat.UserName)
+	} else {
+		chatID = update.Message.ForwardFrom.ID
+		log.Printf("User: ID: %v, Name: %s", chatID, update.Message.ForwardFrom.UserName)
 	}
-	log.Printf("Channel: ID: %v, Name: %s", channelID, update.Message.ForwardFromChat.UserName)
 
 	messageID := update.Message.ForwardFromMessageID
 	msgCfg := tools.MessageConfig{
-		ChannelID: channelID,
+		ChannelID: chatID,
 		MessageID: messageID,
 	}
-
-	//log.Printf("Possible message cfg: %+v", msgCfg)
 
 	var groups []int64
 	var wasRepostOrEdit bool
@@ -206,7 +215,7 @@ func (b *Bot) handleFromFetcher(ctx context.Context, update tgbotapi.Update) err
 
 		wasRepostOrEdit = true
 
-		groups, err = b.db.GetSubsOfChannel(ctx, channelID)
+		groups, err = b.db.GetSubsOfChannel(ctx, chatID)
 		if err != nil {
 			return err
 		}
@@ -214,21 +223,18 @@ func (b *Bot) handleFromFetcher(ctx context.Context, update tgbotapi.Update) err
 		for _, group := range groups {
 			_, err = b.api.Send(tgbotapi.NewMessage(group, "@"+channelName+" отредактировал сообщение:"))
 			if err != nil {
-				log.Printf("Error sending edited post from channel %v to group %v: %v", channelID, group, err)
+				log.Printf("Error sending edited post from channel %v to group %v: %v", chatID, group, err)
 				continue
 			}
 
 			_, err = b.api.Send(tgbotapi.NewForward(group, update.Message.Chat.ID, update.Message.MessageID))
 			if err != nil {
-				log.Printf("Error sending edited post from channel %v to group %v: %v", channelID, group, err)
+				log.Printf("Error sending edited post from channel %v to group %v: %v", chatID, group, err)
 			}
 		}
 	} else {
 		b.channelEdit.mutex.Unlock()
 	}
-
-	//log.Printf("map: %+v", b.channelReposts.reposts)
-
 	b.channelReposts.mutex.Lock()
 	if targets, ok := b.channelReposts.reposts[msgCfg]; ok {
 		delete(b.channelReposts.reposts, msgCfg)
@@ -236,14 +242,12 @@ func (b *Bot) handleFromFetcher(ctx context.Context, update tgbotapi.Update) err
 
 		wasRepostOrEdit = true
 
-		//log.Printf("targets: %+v", targets)
-
 		for _, target := range targets {
 			groups, err = b.db.GetSubsOfChannel(ctx, target.ChannelID)
 			if err != nil {
 				log.Printf(
 					"Could not repost message from channel %v, to channel (%v, %s): %v",
-					channelID,
+					chatID,
 					target.ChannelID,
 					target.ChannelName,
 					err,
@@ -254,13 +258,13 @@ func (b *Bot) handleFromFetcher(ctx context.Context, update tgbotapi.Update) err
 			for _, group := range groups {
 				_, err = b.api.Send(tgbotapi.NewMessage(group, "@"+target.ChannelName+" переслал сообщение:"))
 				if err != nil {
-					log.Printf("Error sending repost from channel %v to group %v: %v", channelID, group, err)
+					log.Printf("Error sending repost from channel %v to group %v: %v", chatID, group, err)
 					continue
 				}
 
 				_, err = b.api.Send(tgbotapi.NewForward(group, update.Message.Chat.ID, update.Message.MessageID))
 				if err != nil {
-					log.Printf("Error sending repost from channel %v to group %v: %v", channelID, group, err)
+					log.Printf("Error sending repost from channel %v to group %v: %v", chatID, group, err)
 				}
 			}
 		}
@@ -268,20 +272,20 @@ func (b *Bot) handleFromFetcher(ctx context.Context, update tgbotapi.Update) err
 		b.channelReposts.mutex.Unlock()
 	}
 
-	if wasRepostOrEdit {
+	if wasRepostOrEdit || update.Message.ForwardFrom != nil {
 		return nil
 	}
 
-	groups, err = b.db.GetSubsOfChannel(ctx, channelID)
+	groups, err = b.db.GetSubsOfChannel(ctx, chatID)
 	if err != nil {
 		return err
 	}
 
 	for _, group := range groups {
-		b.tryUpdateChannelName(ctx, channelID, update.Message.ForwardFromChat.UserName)
+		b.tryUpdateChannelName(ctx, chatID, update.Message.ForwardFromChat.UserName)
 		_, err := b.api.Send(tgbotapi.NewForward(group, update.Message.Chat.ID, update.Message.MessageID))
 		if err != nil {
-			log.Printf("Error sending forward from channel %v to group %v: %v", channelID, group, err)
+			log.Printf("Error sending forward from channel %v to group %v: %v", chatID, group, err)
 		}
 	}
 	return nil

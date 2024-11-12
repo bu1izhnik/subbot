@@ -6,7 +6,7 @@ import (
 	"os"
 )
 
-const SUB_LIMIT = 10
+const SUB_LIMIT = 6
 
 type Config struct {
 	BotToken string

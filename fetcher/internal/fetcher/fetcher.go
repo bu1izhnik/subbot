@@ -80,15 +80,17 @@ func Init(apiID int, apiHash string, botUsername string) (*Fetcher, error) {
 		Path: "./session.json",
 	}
 	client := telegram.NewClient(apiID, apiHash, telegram.Options{UpdateHandler: gaps, SessionStorage: &session})
-	d.OnEditChannelMessage(func(ctx context.Context, e tg.Entities, update *tg.UpdateEditChannelMessage) error {
+
+	// edit config temporarily turned off because of wierd behaviour
+	/*d.OnEditChannelMessage(func(ctx context.Context, e tg.Entities, update *tg.UpdateEditChannelMessage) error {
 		channel, msg, err := f.getChannelAndMessageInfo(ctx, update.Message)
 		if err != nil {
 			log.Printf("Error handling edited message in channel: %v", err)
 			return err
 		}
 
-		// If message has reply markup (ex: giveaway) it will be seen as edited each time someone presses button
-		if msg.ReplyMarkup != nil {
+		// If message has reply markup (ex: giveaway) it will be seen as edited each time someone presses button, same with reactions
+		if msg.ReplyMarkup != nil || len(msg.Reactions.Results) != 0 {
 			return nil
 		}
 
@@ -106,14 +108,16 @@ func Init(apiID int, apiHash string, botUsername string) (*Fetcher, error) {
 			repost: nil,
 		}
 		return nil
-	})
+	})*/
+
 	d.OnNewChannelMessage(func(ctx context.Context, e tg.Entities, update *tg.UpdateNewChannelMessage) error {
-		channel, msg, err := f.getChannelAndMessageInfo(ctx, update.Message)
+		channel, msg, err := f.getChannelAndMessageInfo(ctx, e, update.Message)
 		if err != nil {
 			log.Printf("Error handling new message in channel: %v", err)
 			return err
 		}
 
+		var repostCfg *repostConfig
 		forwardCfg := &forwardConfig{
 			channelID:  channel.ID,
 			accessHash: channel.AccessHash,
@@ -123,40 +127,29 @@ func Init(apiID int, apiHash string, botUsername string) (*Fetcher, error) {
 		if fwd, ok := msg.GetFwdFrom(); ok {
 			var originalChatID int64
 			originalMessageID := fwd.ChannelPost
+			// No chat peer support now
 			switch p := fwd.FromID.(type) {
 			case *tg.PeerChannel:
 				originalChatID = p.ChannelID
 			case *tg.PeerUser:
 				originalChatID = p.UserID
-			case *tg.PeerChat:
-				originalChatID = p.ChatID
 			default:
 				log.Printf("Can't handle repost: unexpected type of original peer: %T", fwd.FromID)
 				return errors.New(fmt.Sprintf("can't handle repost: unexpected type of original peer: %T", fwd.FromID))
 			}
 
-			repostCfg := &repostConfig{
+			repostCfg = &repostConfig{
 				fromID:    originalChatID,
 				messageID: originalMessageID,
 				toID:      channel.ID,
 				toName:    channel.Username,
 			}
-
-			f.sendChan <- &sendConfig{
-				repost:  repostCfg,
-				forward: forwardCfg,
-				edit:    nil,
-			}
-
-			return nil
-			//log.Printf("Message won't be forwarded, because it's already forwarded")
-			//return nil
 		}
 
 		f.sendChan <- &sendConfig{
+			repost:  repostCfg,
 			forward: forwardCfg,
 			edit:    nil,
-			repost:  nil,
 		}
 
 		return nil
@@ -328,7 +321,7 @@ func (f *Fetcher) setBotHashAndID(ctx context.Context) error {
 	return nil
 }
 
-func (f *Fetcher) getChannelAndMessageInfo(ctx context.Context, message tg.MessageClass) (*tg.Channel, *tg.Message, error) {
+func (f *Fetcher) getChannelAndMessageInfo(ctx context.Context, e tg.Entities, message tg.MessageClass) (*tg.Channel, *tg.Message, error) {
 	msg, ok := message.(*tg.Message)
 	if !ok {
 		return nil, nil, errors.New(fmt.Sprintf("unexpected message type %T:", message))
@@ -339,24 +332,5 @@ func (f *Fetcher) getChannelAndMessageInfo(ctx context.Context, message tg.Messa
 		return nil, nil, errors.New(fmt.Sprintf("unexpected peer type: %T", msg.PeerID))
 	}
 
-	getChannel, err := f.client.API().ChannelsGetChannels(ctx, []tg.InputChannelClass{
-		&tg.InputChannel{
-			ChannelID:  peer.ChannelID,
-			AccessHash: 0,
-		},
-	})
-	if err != nil {
-		return nil, nil, errors.New(fmt.Sprintf("Error getting channels (%v) access hash: %v", peer.ChannelID, err))
-	}
-	channelData, ok := getChannel.(*tg.MessagesChats)
-	if !ok {
-		return nil, nil, errors.New(fmt.Sprintf("unexpected channel type %T", getChannel))
-	} else if channelData.Chats == nil {
-		return nil, nil, errors.New("unexpected channel: channel empty")
-	}
-	channel, ok := channelData.Chats[0].(*tg.Channel)
-	if !ok {
-		return nil, nil, errors.New(fmt.Sprintf("unexpected channel chat type %T", channelData.Chats[0]))
-	}
-	return channel, msg, nil
+	return e.Channels[peer.ChannelID], msg, nil
 }

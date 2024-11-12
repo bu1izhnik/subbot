@@ -48,15 +48,13 @@ func main() {
 	)
 	Bot.RegisterCommand(
 		"sub",
-		middleware.GroupOnly(
-			middleware.AdminOnly(
-				commands.SubNext(dbOrm))),
+		middleware.AdminOnly(
+			commands.SubNext(dbOrm)),
 	)
 	Bot.RegisterCommand(
 		"del",
-		middleware.GroupOnly(
-			middleware.AdminOnly(
-				commands.DelNext(dbOrm))),
+		middleware.AdminOnly(
+			commands.DelInit(dbOrm)),
 	)
 	Bot.RegisterCommand(
 		"",
@@ -65,7 +63,7 @@ func main() {
 
 	Bot.RegisterCallback(
 		"del",
-		middleware.GetUsersNext(),
+		commands.Del(dbOrm),
 	)
 
 	go func() {

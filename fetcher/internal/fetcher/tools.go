@@ -7,7 +7,7 @@ import (
 	"github.com/gotd/td/tg"
 )
 
-func (f *Fetcher) getChannelAndMessageInfo(ctx context.Context, e tg.Entities, message tg.MessageClass) (*tg.Channel, *tg.Message, error) {
+func (f *Fetcher) getChannelAndMessageInfo(ctx context.Context, message tg.MessageClass) (*tg.Channel, *tg.Message, error) {
 	msg, ok := message.(*tg.Message)
 	if !ok {
 		return nil, nil, errors.New(fmt.Sprintf("unexpected message type %T:", message))
@@ -18,7 +18,26 @@ func (f *Fetcher) getChannelAndMessageInfo(ctx context.Context, e tg.Entities, m
 		return nil, nil, errors.New(fmt.Sprintf("unexpected peer type: %T", msg.PeerID))
 	}
 
-	return e.Channels[peer.ChannelID], msg, nil
+	getChannel, err := f.client.API().ChannelsGetChannels(ctx, []tg.InputChannelClass{
+		&tg.InputChannel{
+			ChannelID:  peer.ChannelID,
+			AccessHash: 0,
+		},
+	})
+	if err != nil {
+		return nil, nil, errors.New(fmt.Sprintf("Error getting channels (%v) access hash: %v", peer.ChannelID, err))
+	}
+	channelData, ok := getChannel.(*tg.MessagesChats)
+	if !ok {
+		return nil, nil, errors.New(fmt.Sprintf("unexpected channel type %T", getChannel))
+	} else if channelData.Chats == nil {
+		return nil, nil, errors.New("unexpected channel: channel empty")
+	}
+	channel, ok := channelData.Chats[0].(*tg.Channel)
+	if !ok {
+		return nil, nil, errors.New(fmt.Sprintf("unexpected channel chat type %T", channelData.Chats[0]))
+	}
+	return channel, msg, nil
 }
 
 func (f *Fetcher) setBotHashAndID(ctx context.Context) error {

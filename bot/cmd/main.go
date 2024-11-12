@@ -16,8 +16,6 @@ import (
 
 // TODO: add /help
 // TODO: improve error handling
-// TODO: rate limit users
-// TODO: improve error handling from fetcher's API
 
 func main() {
 	config.Load()
@@ -39,7 +37,7 @@ func main() {
 
 	dbOrm := orm.New(dbConn)
 
-	Bot := bot.Init(tgBotApi, dbOrm, 4*time.Second, 30*time.Minute)
+	Bot := bot.Init(tgBotApi, dbOrm, 4*time.Second, 30*time.Minute, cfg.RateLimitConfig)
 
 	Bot.RegisterCommand(
 		"list",
@@ -58,7 +56,7 @@ func main() {
 	)
 	Bot.RegisterCommand(
 		"",
-		middleware.GetUsersNext(),
+		middleware.GetUsersNext(Bot),
 	)
 
 	Bot.RegisterCallback(

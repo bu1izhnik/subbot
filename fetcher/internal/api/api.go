@@ -50,10 +50,14 @@ func (api *Api) handleSubscribe(w http.ResponseWriter, r *http.Request) {
 
 func (api *Api) handleGetChannelInfo(w http.ResponseWriter, r *http.Request) {
 	channelName := chi.URLParam(r, "channelName")
-	channelID, accessHash, err := api.f.GetChannelInfo(r.Context(), channelName)
+	channelID, accessHash, canForward, err := api.f.GetChannelInfo(r.Context(), channelName)
 
 	if err != nil {
 		responseWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if !canForward {
+		responseWithError(w, http.StatusForbidden, "channel has banned forwards")
 		return
 	}
 

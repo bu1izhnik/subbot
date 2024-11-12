@@ -4,10 +4,8 @@ import (
 	"context"
 	"errors"
 	"github.com/BulizhnikGames/subbot/bot/db/orm"
-	"github.com/BulizhnikGames/subbot/bot/internal/requests"
 	"github.com/BulizhnikGames/subbot/bot/tools"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"log"
 	"strconv"
 	"strings"
 )
@@ -27,7 +25,7 @@ func DelInit(db *orm.Queries) tools.Command {
 		inlineKeyboard, err := getInlineKeyboard(ctx, db, update.SentFrom().ID, groupID)
 		if err != nil {
 			if strings.Contains(err.Error(), "no subs") {
-				tools.SendErrorMessage(api, tgbotapi.NewMessage(groupID, "Не вышло выполнить команду: группа не подписана ни на один канал."))
+				tools.SendErrorMessage(api, tgbotapi.NewMessage(groupID, "Не вышло выполнить команду: группа не подписана ни на один канал"))
 				return nil
 			} else {
 				tools.SendErrorMessage(api, tgbotapi.NewMessage(groupID, "Не вышло выполнить команду: ошибка при получении списка подписок группы"))
@@ -35,7 +33,7 @@ func DelInit(db *orm.Queries) tools.Command {
 			}
 		}
 
-		msg := tgbotapi.NewMessage(groupID, "Выберите канал, от которого хотите отписаться.")
+		msg := tgbotapi.NewMessage(groupID, "Выберите канал, от которого хотите отписаться")
 		msg.ReplyMarkup = inlineKeyboard
 		_, err = api.Send(msg)
 		return err
@@ -47,7 +45,7 @@ func Del(db *orm.Queries) tools.Command {
 		groupID := update.FromChat().ID
 
 		callbackData := strings.Split(update.CallbackData(), "#")
-		if callbackData == nil || len(callbackData) != 3 {
+		if callbackData == nil || len(callbackData) != 4 {
 			tools.ResponseToCallbackLogError(
 				api,
 				update,
@@ -76,9 +74,10 @@ func Del(db *orm.Queries) tools.Command {
 			)
 		}
 
-		channelName := tools.GetChannelUsername(callbackData[2])
+		channelID, err := strconv.ParseInt(callbackData[2], 10, 64)
+		channelName := tools.GetChannelUsername(callbackData[3])
 
-		if channelName == "" {
+		if channelID == 0 {
 			err = tools.ResponseToCallback(
 				api,
 				update,
@@ -87,47 +86,9 @@ func Del(db *orm.Queries) tools.Command {
 			return err
 		}
 
-		fetcher, err := tools.GetFetcher(ctx, db, tools.GetMostFullFetcher)
-		if err != nil {
-			tools.ResponseToCallbackLogError(
-				api,
-				update,
-				"Не вышло отписаться от канала: internal error.",
-			)
-			return err
-		}
-
-		requestURL := "http://" + fetcher.Ip + ":" + fetcher.Port + "/" + channelName
-		channel, err := requests.ResolveChannelName(requestURL)
-		if err != nil {
-			if strings.Contains(err.Error(), "channel name") {
-				tools.ResponseToCallbackLogError(
-					api,
-					update,
-					"Не вышло отписаться от канала: неверное имя канала.",
-				)
-			} else {
-				tools.ResponseToCallbackLogError(
-					api,
-					update,
-					"Не вышло отписаться от канала: internal error.",
-				)
-			}
-			return err
-		}
-
-		err = db.ChangeChannelUsernameAndHash(ctx, orm.ChangeChannelUsernameAndHashParams{
-			ID:       channel.ChannelID,
-			Username: channel.Username,
-			Hash:     channel.AccessHash,
-		})
-		if err != nil {
-			log.Printf("Error updating channel's username and hash: %v", err)
-		}
-
 		err = db.UnSubscribe(ctx, orm.UnSubscribeParams{
 			Chat:    groupID,
-			Channel: channel.ChannelID,
+			Channel: channelID,
 		})
 		if err != nil {
 			tools.ResponseToCallbackLogError(
@@ -148,12 +109,17 @@ func Del(db *orm.Queries) tools.Command {
 }
 
 func getInlineKeyboard(ctx context.Context, db *orm.Queries, userID int64, groupID int64) (tgbotapi.InlineKeyboardMarkup, error) {
-	channels, err := db.GetUsernamesOfGroupSubs(ctx, groupID)
+	channels, err := db.GetGroupSubs(ctx, groupID)
 	if err != nil {
 		return tgbotapi.InlineKeyboardMarkup{}, err
 	}
 	if len(channels) == 0 {
 		return tgbotapi.InlineKeyboardMarkup{}, errors.New("no subs for group")
+	}
+
+	ids := make([]string, len(channels))
+	for i, channel := range channels {
+		ids[i] = strconv.Itoa(int(channel.ID))
 	}
 
 	textID := strconv.Itoa(int(userID))
@@ -164,19 +130,19 @@ func getInlineKeyboard(ctx context.Context, db *orm.Queries, userID int64, group
 		if i == len(channels)-1 {
 			rows[rowIndex] = []tgbotapi.InlineKeyboardButton{
 				tgbotapi.NewInlineKeyboardButtonData(
-					"@"+channels[i],
-					"del#"+textID+"#"+channels[i],
+					"@"+channels[i].Username,
+					"del#"+textID+"#"+ids[i]+"#"+channels[i].Username,
 				),
 			}
 		} else {
 			rows[rowIndex] = []tgbotapi.InlineKeyboardButton{
 				tgbotapi.NewInlineKeyboardButtonData(
-					"@"+channels[i],
-					"del#"+textID+"#"+channels[i],
+					"@"+channels[i].Username,
+					"del#"+textID+"#"+ids[i]+"#"+channels[i].Username,
 				),
 				tgbotapi.NewInlineKeyboardButtonData(
-					"@"+channels[i+1],
-					"del#"+textID+"#"+channels[i+1],
+					"@"+channels[i+1].Username,
+					"del#"+textID+"#"+ids[i+1]+"#"+channels[i+1].Username,
 				),
 			}
 		}
@@ -185,7 +151,7 @@ func getInlineKeyboard(ctx context.Context, db *orm.Queries, userID int64, group
 	rows[rowIndex] = []tgbotapi.InlineKeyboardButton{
 		tgbotapi.NewInlineKeyboardButtonData(
 			"Отмена",
-			"del#"+textID+"#",
+			"del#"+textID+"#0#",
 		),
 	}
 	return tgbotapi.NewInlineKeyboardMarkup(rows...), nil

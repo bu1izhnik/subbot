@@ -19,7 +19,8 @@ import (
 	"time"
 )
 
-// TODO: don't let user sub to noforward channels or somehow fetch data from it
+// TODO: cache messages for handling edits
+// TODO: forward noforward messages by copying text
 
 // This config sends to main bot when there is need to handle edit
 type editConfig struct {
@@ -111,7 +112,7 @@ func Init(apiID int, apiHash string, botUsername string) (*Fetcher, error) {
 	})*/
 
 	d.OnNewChannelMessage(func(ctx context.Context, e tg.Entities, update *tg.UpdateNewChannelMessage) error {
-		channel, msg, err := f.getChannelAndMessageInfo(ctx, e, update.Message)
+		channel, msg, err := f.getChannelAndMessageInfo(ctx, update.Message)
 		if err != nil {
 			log.Printf("Error handling new message in channel: %v", err)
 			return err
@@ -266,7 +267,11 @@ func (f *Fetcher) tick(ctx context.Context, interval time.Duration) {
 				RandomID: []int64{rand.Int63()},
 			})
 			if err != nil {
-				log.Printf("Error forwarding messages: %v", err)
+				log.Printf(
+					"Error forwarding message from %v: %v",
+					send.forward.channelID,
+					err,
+				)
 			}
 		case <-ctx.Done():
 			return

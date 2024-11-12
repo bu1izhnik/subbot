@@ -16,7 +16,7 @@ func Init() {
 	}
 }
 
-func GetUsersNext() tools.Command {
+func GetUsersNext(bot checker) tools.Command {
 	return func(ctx context.Context, api *tgbotapi.BotAPI, update tgbotapi.Update) error {
 		userID := update.SentFrom().ID
 
@@ -25,7 +25,7 @@ func GetUsersNext() tools.Command {
 		UserNext.Mutex.Unlock()
 
 		if ok {
-			err := command(ctx, api, update)
+			err := CheckRateLimit(bot, command)(ctx, api, update)
 			UserNext.Mutex.Lock()
 			delete(UserNext.List, userID)
 			UserNext.Mutex.Unlock()

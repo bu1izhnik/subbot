@@ -17,8 +17,8 @@ UPDATE channels
 SET username = $2, hash = $3
 WHERE id = $1;
 
--- name: GetUsernamesOfGroupSubs :many
-SELECT channels.username FROM channels
+-- name: GetGroupSubs :many
+SELECT channels.id, channels.username FROM channels
 JOIN subs ON channels.id = subs.channel
 WHERE subs.chat = $1;
 

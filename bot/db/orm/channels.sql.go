@@ -95,25 +95,30 @@ func (q *Queries) DeleteChannel(ctx context.Context, id int64) error {
 	return err
 }
 
-const getUsernamesOfGroupSubs = `-- name: GetUsernamesOfGroupSubs :many
-SELECT channels.username FROM channels
+const getGroupSubs = `-- name: GetGroupSubs :many
+SELECT channels.id, channels.username FROM channels
 JOIN subs ON channels.id = subs.channel
 WHERE subs.chat = $1
 `
 
-func (q *Queries) GetUsernamesOfGroupSubs(ctx context.Context, chat int64) ([]string, error) {
-	rows, err := q.db.QueryContext(ctx, getUsernamesOfGroupSubs, chat)
+type GetGroupSubsRow struct {
+	ID       int64
+	Username string
+}
+
+func (q *Queries) GetGroupSubs(ctx context.Context, chat int64) ([]GetGroupSubsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getGroupSubs, chat)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []string
+	var items []GetGroupSubsRow
 	for rows.Next() {
-		var username string
-		if err := rows.Scan(&username); err != nil {
+		var i GetGroupSubsRow
+		if err := rows.Scan(&i.ID, &i.Username); err != nil {
 			return nil, err
 		}
-		items = append(items, username)
+		items = append(items, i)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err

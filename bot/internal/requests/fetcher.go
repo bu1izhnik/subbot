@@ -22,8 +22,10 @@ func ResolveChannelName(reqURL string) (*ChannelData, error) {
 	if err != nil {
 		return nil, err
 	}
-	if res.StatusCode != http.StatusOK {
+	if res.StatusCode == http.StatusBadRequest {
 		return nil, errors.New("could not resolve channel name")
+	} else if res.StatusCode == http.StatusForbidden {
+		return nil, errors.New("channel has forbidden forwards")
 	}
 
 	decoder := json.NewDecoder(res.Body)

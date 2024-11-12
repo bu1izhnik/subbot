@@ -17,7 +17,7 @@ func SubNext(db *orm.Queries) tools.Command {
 		middleware.UserNext.Mutex.Lock()
 		middleware.UserNext.List[update.Message.From.ID] = middleware.AdminOnly(sub(db))
 		middleware.UserNext.Mutex.Unlock()
-		_, err := api.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Отправьте ссылку или юзернейм канала, на который надо подписаться."))
+		_, err := api.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Отправьте ссылку или юзернейм канала, на который надо подписаться"))
 		return err
 	}
 }
@@ -27,28 +27,28 @@ func sub(db *orm.Queries) tools.Command {
 		groupID := update.Message.Chat.ID
 		channelName := tools.GetChannelUsername(update.Message.Text)
 
-		channels, err := db.ListGroupSubs(ctx, groupID)
+		channels, err := db.GetGroupSubs(ctx, groupID)
 		if err != nil {
 			tools.SendErrorMessage(api, tgbotapi.NewMessage(
 				groupID,
-				"Не вышло подписаться на канал: internal error.",
+				"Не вышло подписаться на канал: internal error",
 			))
 			return err
 		}
 
-		if len(channels) >= config.SUB_LIMIT {
+		if len(channels) >= config.SubLimit {
 			_, err = api.Send(tgbotapi.NewMessage(
 				groupID,
-				fmt.Sprintf("Не вышло подписаться на канал: достигнут максимум в %v подписок.", config.SUB_LIMIT),
+				fmt.Sprintf("Не вышло подписаться на канал: достигнут максимум в %v подписок", config.SubLimit),
 			))
 			return err
 		}
 
-		fetcher, err := tools.GetFetcher(ctx, db, tools.GetLeastFullFetcher)
+		fetcher, err := tools.GetFetcher(ctx, db, tools.LeastFull)
 		if err != nil {
 			tools.SendErrorMessage(api, tgbotapi.NewMessage(
 				groupID,
-				"Не вышло подписаться на канал: internal error.",
+				"Не вышло подписаться на канал: internal error",
 			))
 			return err
 		}
@@ -56,31 +56,38 @@ func sub(db *orm.Queries) tools.Command {
 		requestURL := "http://" + fetcher.Ip + ":" + fetcher.Port + "/" + channelName
 		channelCheck, err := requests.ResolveChannelName(requestURL)
 		if err != nil {
-			if strings.Contains(err.Error(), "channel name") {
+			if strings.Contains(err.Error(), "name") {
 				tools.SendErrorMessage(api, tgbotapi.NewMessage(
 					groupID,
-					"Не вышло подписаться на канал: неверное имя канала.",
+					"Не вышло подписаться на канал: неверное имя канала",
 				))
+				return err
+			} else if strings.Contains(err.Error(), "forwards") {
+				tools.SendErrorMessage(api, tgbotapi.NewMessage(
+					groupID,
+					"Не вышло подписаться на канал: из канала нельзя пересылать сообщения",
+				))
+				return err
 			} else {
 				tools.SendErrorMessage(api, tgbotapi.NewMessage(
 					groupID,
-					"Не вышло подписаться на канал: internal error.",
+					"Не вышло подписаться на канал: internal error",
 				))
+				return err
 			}
-			return err
 		}
 
 		cnt, err := db.ChannelAlreadyStored(ctx, channelCheck.ChannelID)
 		if err != nil {
 			tools.SendErrorMessage(api, tgbotapi.NewMessage(
 				groupID,
-				"Не вышло подписаться на канал: internal error.",
+				"Не вышло подписаться на канал: internal error",
 			))
 			return err
 		}
 
-		for _, ID := range channels {
-			if ID == channelCheck.ChannelID {
+		for _, alreadySubChannel := range channels {
+			if alreadySubChannel.ID == channelCheck.ChannelID {
 				_, err = api.Send(tgbotapi.NewMessage(
 					groupID,
 					"Группа уже подписана на @"+channelName,
@@ -90,12 +97,13 @@ func sub(db *orm.Queries) tools.Command {
 		}
 
 		channel := channelCheck
+		// If channel isn't parsed by some fetcher already sub some fetcher to it
 		if cnt == 0 {
 			channel, err = requests.SubscribeToChannel(requestURL)
 			if err != nil {
 				tools.SendErrorMessage(api, tgbotapi.NewMessage(
 					groupID,
-					"Не вышло подписаться на канал: internal error.",
+					"Не вышло подписаться на канал: internal error",
 				))
 				return err
 			}
@@ -109,7 +117,7 @@ func sub(db *orm.Queries) tools.Command {
 			if err != nil {
 				tools.SendErrorMessage(api, tgbotapi.NewMessage(
 					groupID,
-					"Не вышло подписаться на канал: internal error.",
+					"Не вышло подписаться на канал: internal error",
 				))
 				return err
 			}
@@ -122,7 +130,7 @@ func sub(db *orm.Queries) tools.Command {
 		if err != nil {
 			tools.SendErrorMessage(api, tgbotapi.NewMessage(
 				groupID,
-				"Не вышло подписаться на канал: internal error.",
+				"Не вышло подписаться на канал: internal error",
 			))
 			return err
 		}

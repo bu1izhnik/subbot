@@ -213,31 +213,6 @@ func (f *Fetcher) Run(phone string, password string, apiURL string, IP string, p
 	})
 }
 
-func (f *Fetcher) SubscribeToChannel(ctx context.Context, channelName string) (int64, int64, error) {
-	channelID, accessHash, err := f.GetChannelInfo(ctx, channelName)
-	if err != nil {
-		return 0, 0, err
-	}
-	channel := tg.InputChannel{ChannelID: channelID, AccessHash: accessHash}
-	_, err = f.client.API().ChannelsJoinChannel(ctx, &channel)
-	return channelID, accessHash, err
-}
-
-func (f *Fetcher) GetChannelInfo(ctx context.Context, channelName string) (int64, int64, error) {
-	res, err := f.client.API().ContactsResolveUsername(ctx, channelName)
-	if err != nil {
-		return 0, 0, err
-	}
-	if len(res.Chats) == 0 {
-		return 0, 0, errors.New("not a channel: got 0 chats by resolving")
-	}
-	if channel, ok := res.Chats[0].(*tg.Channel); ok {
-		return channel.ID, channel.AccessHash, nil
-	} else {
-		return 0, 0, errors.New(fmt.Sprintf("not a channel: invalid chat type (%T)", res.Chats[0]))
-	}
-}
-
 func (f *Fetcher) tick(ctx context.Context, interval time.Duration) {
 	for {
 		select {
@@ -298,39 +273,4 @@ func (f *Fetcher) tick(ctx context.Context, interval time.Duration) {
 		}
 		time.Sleep(interval)
 	}
-}
-
-func (f *Fetcher) setBotHashAndID(ctx context.Context) error {
-	resolved, err := f.client.API().ContactsResolveUsername(ctx, f.botUsername)
-	if err != nil {
-		return errors.New(fmt.Sprintf("failed to resolve username of bot (%v) to foward message: %v", f.botUsername, err))
-	}
-
-	if len(resolved.Users) > 0 {
-		user := resolved.Users[0]
-		if u, ok := user.(*tg.User); ok {
-			f.botID = u.ID
-			f.botHash = u.AccessHash
-		} else {
-			return errors.New(fmt.Sprintf("failed to resolve username of bot (%v): not a user", f.botUsername))
-		}
-	} else {
-		return errors.New(fmt.Sprintf("failed to resolve username of bot (%v): resolving returned 0 users", f.botUsername))
-	}
-
-	return nil
-}
-
-func (f *Fetcher) getChannelAndMessageInfo(ctx context.Context, e tg.Entities, message tg.MessageClass) (*tg.Channel, *tg.Message, error) {
-	msg, ok := message.(*tg.Message)
-	if !ok {
-		return nil, nil, errors.New(fmt.Sprintf("unexpected message type %T:", message))
-	}
-
-	peer, ok := msg.PeerID.(*tg.PeerChannel)
-	if !ok {
-		return nil, nil, errors.New(fmt.Sprintf("unexpected peer type: %T", msg.PeerID))
-	}
-
-	return e.Channels[peer.ChannelID], msg, nil
 }

@@ -112,47 +112,7 @@ func Init(apiID int, apiHash string, botUsername string) (*Fetcher, error) {
 	})*/
 
 	d.OnNewChannelMessage(func(ctx context.Context, e tg.Entities, update *tg.UpdateNewChannelMessage) error {
-		channel, msg, err := f.getChannelAndMessageInfo(ctx, update.Message)
-		if err != nil {
-			log.Printf("Error handling new message in channel: %v", err)
-			return err
-		}
-
-		var repostCfg *repostConfig
-		forwardCfg := &forwardConfig{
-			channelID:  channel.ID,
-			accessHash: channel.AccessHash,
-			messageID:  msg.ID,
-		}
-
-		if fwd, ok := msg.GetFwdFrom(); ok {
-			var originalChatID int64
-			originalMessageID := fwd.ChannelPost
-			// No chat peer support now
-			switch p := fwd.FromID.(type) {
-			case *tg.PeerChannel:
-				originalChatID = p.ChannelID
-			case *tg.PeerUser:
-				originalChatID = p.UserID
-			default:
-				log.Printf("Can't handle repost: unexpected type of original peer: %T", fwd.FromID)
-				return errors.New(fmt.Sprintf("can't handle repost: unexpected type of original peer: %T", fwd.FromID))
-			}
-
-			repostCfg = &repostConfig{
-				fromID:    originalChatID,
-				messageID: originalMessageID,
-				toID:      channel.ID,
-				toName:    channel.Username,
-			}
-		}
-
-		f.sendChan <- &sendConfig{
-			repost:  repostCfg,
-			forward: forwardCfg,
-			edit:    nil,
-		}
-
+		go f.handleNewMessage(ctx, update)
 		return nil
 	})
 
@@ -212,6 +172,51 @@ func (f *Fetcher) Run(phone string, password string, apiURL string, IP string, p
 			},
 		})
 	})
+}
+
+func (f *Fetcher) handleNewMessage(ctx context.Context, update *tg.UpdateNewChannelMessage) error {
+	channel, msg, err := f.getChannelAndMessageInfo(ctx, update.Message)
+	if err != nil {
+		log.Printf("Error handling new message in channel: %v", err)
+		return err
+	}
+
+	var repostCfg *repostConfig
+	forwardCfg := &forwardConfig{
+		channelID:  channel.ID,
+		accessHash: channel.AccessHash,
+		messageID:  msg.ID,
+	}
+
+	if fwd, ok := msg.GetFwdFrom(); ok {
+		var originalChatID int64
+		originalMessageID := fwd.ChannelPost
+		// No chat peer support now
+		switch p := fwd.FromID.(type) {
+		case *tg.PeerChannel:
+			originalChatID = p.ChannelID
+		case *tg.PeerUser:
+			originalChatID = p.UserID
+		default:
+			log.Printf("Can't handle repost: unexpected type of original peer: %T", fwd.FromID)
+			return errors.New(fmt.Sprintf("can't handle repost: unexpected type of original peer: %T", fwd.FromID))
+		}
+
+		repostCfg = &repostConfig{
+			fromID:    originalChatID,
+			messageID: originalMessageID,
+			toID:      channel.ID,
+			toName:    channel.Username,
+		}
+	}
+
+	f.sendChan <- &sendConfig{
+		repost:  repostCfg,
+		forward: forwardCfg,
+		edit:    nil,
+	}
+
+	return nil
 }
 
 func (f *Fetcher) tick(ctx context.Context, interval time.Duration) {

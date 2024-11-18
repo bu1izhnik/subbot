@@ -12,7 +12,7 @@ import (
 	"strings"
 )
 
-func SubNext(db *orm.Queries) tools.Command {
+func SubInit(db *orm.Queries) tools.Command {
 	return func(ctx context.Context, api *tgbotapi.BotAPI, update tgbotapi.Update) error {
 		middleware.UserNext.Mutex.Lock()
 		middleware.UserNext.List[update.Message.From.ID] = middleware.AdminOnly(sub(db))

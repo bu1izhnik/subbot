@@ -47,12 +47,20 @@ func main() {
 	Bot.RegisterCommand(
 		"sub",
 		middleware.AdminOnly(
-			commands.SubNext(dbOrm)),
+			commands.SubInit(dbOrm)),
 	)
 	Bot.RegisterCommand(
 		"del",
 		middleware.AdminOnly(
 			commands.DelInit(dbOrm)),
+	)
+	Bot.RegisterCommand(
+		"help",
+		commands.Help,
+	)
+	Bot.RegisterCommand(
+		"start",
+		commands.Start,
 	)
 	Bot.RegisterCommand(
 		"",

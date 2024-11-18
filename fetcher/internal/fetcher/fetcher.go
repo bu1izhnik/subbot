@@ -1,10 +1,16 @@
 package fetcher
 
 import (
+	"github.com/go-faster/errors"
+	boltstor "github.com/gotd/contrib/bbolt"
+	"go.etcd.io/bbolt"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	lj "gopkg.in/natefinch/lumberjack.v2"
+
 	"bufio"
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"github.com/gotd/td/telegram"
 	"github.com/gotd/td/telegram/auth"
@@ -77,10 +83,40 @@ func Init(apiID int, apiHash string, botUsername string) (*Fetcher, error) {
 	gaps := updates.New(updates.Config{
 		Handler: d,
 	})
+
 	session := telegram.FileSessionStorage{
 		Path: "./session.json",
 	}
-	client := telegram.NewClient(apiID, apiHash, telegram.Options{UpdateHandler: gaps, SessionStorage: &session})
+
+	logWriter := zapcore.AddSync(&lj.Logger{
+		Filename:   "./log.json",
+		MaxBackups: 3,
+		MaxSize:    1, // megabytes
+		MaxAge:     7, // days
+	})
+	logCore := zapcore.NewCore(
+		zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
+		logWriter,
+		zap.DebugLevel,
+	)
+	lg := zap.New(logCore)
+	defer func() { _ = lg.Sync() }()
+
+	boltdb, err := bbolt.Open("./updates.bolt.db", 0666, nil)
+	if err != nil {
+		log.Fatalf("Error creating bolt db: %v", err)
+	}
+	updatesRecovery := updates.New(updates.Config{
+		Handler: gaps, // using previous handler with peerDB
+		Logger:  lg.Named("updates.recovery"),
+		Storage: boltstor.NewStateStorage(boltdb),
+	})
+
+	client := telegram.NewClient(apiID, apiHash, telegram.Options{
+		Logger:         lg,
+		UpdateHandler:  updatesRecovery,
+		SessionStorage: &session,
+	})
 
 	// edit config temporarily turned off because of wierd behaviour
 	/*d.OnEditChannelMessage(func(ctx context.Context, e tg.Entities, update *tg.UpdateEditChannelMessage) error {

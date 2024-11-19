@@ -1,4 +1,4 @@
 .env
 session.json
-log.json
+.logs/
 updates.bolt.db

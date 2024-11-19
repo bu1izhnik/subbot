@@ -89,7 +89,7 @@ func Init(apiID int, apiHash string, botUsername string) (*Fetcher, error) {
 	}
 
 	logWriter := zapcore.AddSync(&lj.Logger{
-		Filename:   "./log.json",
+		Filename:   "./logs/log.json",
 		MaxBackups: 3,
 		MaxSize:    1, // megabytes
 		MaxAge:     7, // days

@@ -2,4 +2,6 @@
 session.json
 logs/
 /logs/
+main
+main.exe
 updates.bolt.db

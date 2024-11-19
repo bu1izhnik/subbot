@@ -5,13 +5,14 @@ import (
 	"github.com/BulizhnikGames/subbot/fetcher/internal/config"
 	"github.com/BulizhnikGames/subbot/fetcher/internal/fetcher"
 	"log"
+	"time"
 )
 
 func main() {
 	config.Load()
 	cfg := config.Get()
 
-	f, err := fetcher.Init(cfg.APIID, cfg.APIHash, cfg.BotUsername)
+	f, err := fetcher.Init(cfg.APIID, cfg.APIHash, cfg.BotUsername, 5*time.Second)
 	if err != nil {
 		log.Fatal(err)
 	}

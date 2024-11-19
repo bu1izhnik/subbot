@@ -1,12 +1,12 @@
 package fetcher
 
 import (
-	"github.com/go-faster/errors"
 	boltstor "github.com/gotd/contrib/bbolt"
 	"go.etcd.io/bbolt"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	lj "gopkg.in/natefinch/lumberjack.v2"
+	"sync"
 
 	"bufio"
 	"bytes"
@@ -28,55 +28,17 @@ import (
 // TODO: cache messages for handling edits
 // TODO: forward noforward messages by copying text
 
-// This config sends to main bot when there is need to handle edit
-type editConfig struct {
-	// ID of channel in which edit was done
-	channelID int64
-	// ID of message which was edited
-	messageID int
-	// Name of channel in which edit was done
-	channelName string
-}
-
-// This config sends to main bot when there is need to handle repost
-type repostConfig struct {
-	// ID of channel from which repost was done
-	fromID int64
-	// ID of message in channel from which repost was done
-	messageID int
-	// ID of channel which reposted
-	toID int64
-	// Name of channel which reposted
-	toName string
-}
-
-type forwardConfig struct {
-	channelID  int64
-	accessHash int64
-	messageID  int
-}
-
-type sendConfig struct {
-	edit    *editConfig
-	repost  *repostConfig
-	forward *forwardConfig
-}
-
-type Fetcher struct {
-	client      *telegram.Client
-	gaps        *updates.Manager
-	sendChan    chan *sendConfig
-	botUsername string
-	botID       int64
-	botHash     int64
-}
-
-func Init(apiID int, apiHash string, botUsername string) (*Fetcher, error) {
+func Init(apiID int, apiHash string, botUsername string, mediaWait time.Duration) (*Fetcher, error) {
 	f := &Fetcher{
 		botID:       0,
 		botHash:     0,
 		botUsername: botUsername,
 		sendChan:    make(chan *sendConfig, 1000),
+		multiMediaQueue: AsyncMap[int64, *sendConfig]{
+			List:  make(map[int64]*sendConfig),
+			Mutex: sync.Mutex{},
+		},
+		mediaWaitTimer: mediaWait,
 	}
 
 	d := tg.NewUpdateDispatcher()
@@ -210,51 +172,6 @@ func (f *Fetcher) Run(phone string, password string, apiURL string, IP string, p
 	})
 }
 
-func (f *Fetcher) handleNewMessage(ctx context.Context, update *tg.UpdateNewChannelMessage) error {
-	channel, msg, err := f.getChannelAndMessageInfo(ctx, update.Message)
-	if err != nil {
-		log.Printf("Error handling new message in channel: %v", err)
-		return err
-	}
-
-	var repostCfg *repostConfig
-	forwardCfg := &forwardConfig{
-		channelID:  channel.ID,
-		accessHash: channel.AccessHash,
-		messageID:  msg.ID,
-	}
-
-	if fwd, ok := msg.GetFwdFrom(); ok {
-		var originalChatID int64
-		originalMessageID := fwd.ChannelPost
-		// No chat peer support now
-		switch p := fwd.FromID.(type) {
-		case *tg.PeerChannel:
-			originalChatID = p.ChannelID
-		case *tg.PeerUser:
-			originalChatID = p.UserID
-		default:
-			log.Printf("Can't handle repost: unexpected type of original peer: %T", fwd.FromID)
-			return errors.New(fmt.Sprintf("can't handle repost: unexpected type of original peer: %T", fwd.FromID))
-		}
-
-		repostCfg = &repostConfig{
-			fromID:    originalChatID,
-			messageID: originalMessageID,
-			toID:      channel.ID,
-			toName:    channel.Username,
-		}
-	}
-
-	f.sendChan <- &sendConfig{
-		repost:  repostCfg,
-		forward: forwardCfg,
-		edit:    nil,
-	}
-
-	return nil
-}
-
 func (f *Fetcher) tick(ctx context.Context, interval time.Duration) {
 	for {
 		select {
@@ -304,8 +221,8 @@ func (f *Fetcher) tick(ctx context.Context, interval time.Duration) {
 					AccessHash: send.forward.accessHash,
 				},
 				ToPeer:   botPeer,
-				ID:       []int{send.forward.messageID},
-				RandomID: []int64{rand.Int63()},
+				ID:       send.forward.messageIDs,
+				RandomID: getRandomIDs(len(send.forward.messageIDs)),
 			})
 			if err != nil {
 				log.Printf(

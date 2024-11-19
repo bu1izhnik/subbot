@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gotd/td/tg"
+	"log"
+	"math/rand"
+	"time"
 )
 
 func (f *Fetcher) getChannelAndMessageInfo(ctx context.Context, message tg.MessageClass) (*tg.Channel, *tg.Message, error) {
@@ -59,4 +62,23 @@ func (f *Fetcher) setBotHashAndID(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (f *Fetcher) waitForOtherMediaInGroup(groupID int64) {
+	time.Sleep(f.mediaWaitTimer)
+	f.multiMediaQueue.Mutex.Lock()
+	defer f.multiMediaQueue.Mutex.Unlock()
+	if f.multiMediaQueue.List[groupID] != nil {
+		f.sendChan <- f.multiMediaQueue.List[groupID]
+		delete(f.multiMediaQueue.List, groupID)
+		log.Printf("Forwarded media group: %v", groupID)
+	}
+}
+
+func getRandomIDs(n int) []int64 {
+	res := make([]int64, n)
+	for i := 0; i < n; i++ {
+		res[i] = rand.Int63()
+	}
+	return res
 }

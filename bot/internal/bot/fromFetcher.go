@@ -53,6 +53,8 @@ func (b *Bot) handleFromFetcher(ctx context.Context, update tgbotapi.Update) err
 		return nil
 	}
 
+	log.Printf("msg info: %s", update.Message.MediaGroupID)
+
 	groups, err := b.db.GetSubsOfChannel(ctx, chatID)
 	if err != nil {
 		return err

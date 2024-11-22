@@ -43,7 +43,7 @@ func Get() Config {
 		log.Fatal("IP not found in .env")
 	}
 
-	c.Port = os.Getenv("Port")
+	c.Port = os.Getenv("PORT")
 	if c.Port == "" {
 		log.Fatal("Port not found in .env")
 	}

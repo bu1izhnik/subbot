@@ -22,19 +22,27 @@ type Bot struct {
 
 	// key is message which was reposted and value is channels to which it was reposted
 	channelReposts tools.AsyncMap[tools.MessageConfig, []tools.RepostedTo]
-	// key is message which was edited, value is username of channel
+	// key is message which was edited and value is username of channel
 	channelEdit tools.AsyncMap[tools.MessageConfig, string]
 	// key is id of user and value is his message count per last interval of checks and his ban time of exists
 	usersLimits tools.AsyncMap[int64, *tools.RateLimitConfig]
+	// key is group id of multimedia and value is messages to forward
+	multiMediaQueue tools.AsyncMap[int64, *tools.MultiMediaConfig]
 
 	config.RateLimitConfig
 
-	checkRateLimits <-chan time.Time
-	removeGarbage   <-chan time.Time
-	timeout         time.Duration
+	checkRateLimits       <-chan time.Time
+	removeGarbage         <-chan time.Time
+	maxMultiMediaWaitTime time.Duration
+	timeout               time.Duration
 }
 
-func Init(api *tgbotapi.BotAPI, db *orm.Queries, timeout time.Duration, garbageTimeout time.Duration, rateLimitCfg config.RateLimitConfig) *Bot {
+func Init(api *tgbotapi.BotAPI,
+	db *orm.Queries,
+	timeout time.Duration,
+	garbageTimeout time.Duration,
+	rateLimitCfg config.RateLimitConfig,
+	multiMediaWaitTime time.Duration) *Bot {
 	return &Bot{
 		api: api,
 		db:  db,
@@ -54,12 +62,17 @@ func Init(api *tgbotapi.BotAPI, db *orm.Queries, timeout time.Duration, garbageT
 			List:  make(map[int64]*tools.RateLimitConfig),
 			Mutex: sync.Mutex{},
 		},
+		multiMediaQueue: tools.AsyncMap[int64, *tools.MultiMediaConfig]{
+			List:  make(map[int64]*tools.MultiMediaConfig),
+			Mutex: sync.Mutex{},
+		},
 
 		RateLimitConfig: rateLimitCfg,
 
-		checkRateLimits: time.NewTicker(time.Duration(rateLimitCfg.RateLimitCheckInterval) * time.Second).C,
-		removeGarbage:   time.NewTicker(garbageTimeout).C,
-		timeout:         timeout,
+		checkRateLimits:       time.NewTicker(time.Duration(rateLimitCfg.RateLimitCheckInterval) * time.Second).C,
+		removeGarbage:         time.NewTicker(garbageTimeout).C,
+		maxMultiMediaWaitTime: multiMediaWaitTime,
+		timeout:               timeout,
 	}
 }
 

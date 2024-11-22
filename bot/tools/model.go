@@ -34,6 +34,14 @@ type RateLimitConfig struct {
 	LimitedUntil time.Time
 }
 
+type MultiMediaConfig struct {
+	FromFetcherChat int64
+	FromChannel     int64
+	IDs             [10]int
+	Cnt             int
+	GotMaxMedia     chan struct{}
+}
+
 type GetFetcherRequest func(ctx context.Context, db *orm.Queries) (*FetcherParams, error)
 
 type Command func(ctx context.Context, api *tgbotapi.BotAPI, update tgbotapi.Update) error

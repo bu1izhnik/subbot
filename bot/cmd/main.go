@@ -38,7 +38,14 @@ func main() {
 
 	dbOrm := orm.New(dbConn)
 
-	Bot := bot.Init(tgBotApi, dbOrm, 4*time.Second, 30*time.Minute, cfg.RateLimitConfig)
+	Bot := bot.Init(
+		tgBotApi,
+		dbOrm,
+		4*time.Second,
+		30*time.Minute,
+		cfg.RateLimitConfig,
+		2*time.Second,
+	)
 
 	Bot.RegisterCommand(
 		"list",

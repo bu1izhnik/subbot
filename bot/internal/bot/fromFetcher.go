@@ -7,6 +7,7 @@ import (
 	"github.com/BulizhnikGames/subbot/bot/tools"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"log"
+	"strconv"
 )
 
 func (b *Bot) handleFromFetcher(ctx context.Context, update tgbotapi.Update) error {
@@ -53,7 +54,22 @@ func (b *Bot) handleFromFetcher(ctx context.Context, update tgbotapi.Update) err
 		return nil
 	}
 
-	log.Printf("msg info: %s", update.Message.MediaGroupID)
+	b.tryUpdateChannelName(ctx, chatID, update.Message.ForwardFromChat.UserName)
+
+	if update.Message.MediaGroupID != "" {
+		mediaGroup, _ := strconv.ParseInt(
+			update.Message.MediaGroupID,
+			10,
+			64,
+		)
+		b.queueMultiMedia(
+			messageID,
+			chatID,
+			update.Message.Chat.ID,
+			mediaGroup,
+		)
+		return nil
+	}
 
 	groups, err := b.db.GetSubsOfChannel(ctx, chatID)
 	if err != nil {
@@ -61,7 +77,6 @@ func (b *Bot) handleFromFetcher(ctx context.Context, update tgbotapi.Update) err
 	}
 
 	for _, group := range groups {
-		b.tryUpdateChannelName(ctx, chatID, update.Message.ForwardFromChat.UserName)
 		_, err := b.api.Send(tgbotapi.NewForward(group, update.Message.Chat.ID, update.Message.MessageID))
 		if err != nil {
 			log.Printf("Error sending forward from channel %v to group %v: %v", chatID, group, err)

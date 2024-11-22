@@ -32,10 +32,10 @@ func (b *Bot) handleFromFetcher(ctx context.Context, update tgbotapi.Update) err
 		log.Printf("User: ID: %v, Name: %s", chatID, update.Message.ForwardFrom.UserName)
 	}
 
-	messageID := update.Message.ForwardFromMessageID
+	forwardMessageID := update.Message.ForwardFromMessageID
 	msgCfg := tools.MessageConfig{
 		ChannelID: chatID,
-		MessageID: messageID,
+		MessageID: forwardMessageID,
 	}
 
 	ok, err := b.tryHandleEdit(ctx, update, msgCfg, chatID)
@@ -63,7 +63,7 @@ func (b *Bot) handleFromFetcher(ctx context.Context, update tgbotapi.Update) err
 			64,
 		)
 		b.queueMultiMedia(
-			messageID,
+			update.Message.MessageID,
 			chatID,
 			update.Message.Chat.ID,
 			mediaGroup,

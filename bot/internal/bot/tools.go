@@ -141,30 +141,14 @@ func (b *Bot) forwardMultimedia(groupID int64) {
 	delete(b.multiMediaQueue.List, groupID)
 	b.multiMediaQueue.Mutex.Unlock()
 
-	groups, err := b.db.GetSubsOfChannel(
+	err := b.forwardPostToSubs(
 		context.Background(),
 		channelID,
+		fetcherChatID,
+		&IDs,
 	)
 	if err != nil {
-		log.Printf("Error getting subs of channel for multimedia: %v", err)
-	}
-
-	log.Printf("%v", len(groups))
-
-	for _, group := range groups {
-		err = b.forwardMessages(
-			group,
-			fetcherChatID,
-			&IDs,
-		)
-		if err != nil {
-			log.Printf(
-				"Error sending multimedia forward from channel %v to group %v: %v",
-				channelID,
-				group,
-				err,
-			)
-		}
+		log.Printf("Error forwarding multimedia: %v", err)
 	}
 }
 
@@ -191,7 +175,7 @@ func (b *Bot) forwardMessages(toChat int64, fetcherChat int64, messageIDs *[]int
 	)
 	bodyReader := bytes.NewReader(jsonBody)
 
-	log.Printf("req body: %s", jsonBody)
+	//log.Printf("req body: %s", jsonBody)
 
 	req, err := http.NewRequest(http.MethodPost, url, bodyReader)
 	if err != nil {
@@ -217,7 +201,7 @@ func (b *Bot) forwardMessages(toChat int64, fetcherChat int64, messageIDs *[]int
 		return err
 	}
 
-	log.Printf("Reps: %s", string(data))
+	//log.Printf("Reps: %s", string(data))
 
 	return nil
 }

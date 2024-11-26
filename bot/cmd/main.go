@@ -15,8 +15,6 @@ import (
 )
 
 // TODO: improve error handling
-// TODO: move from tgbotapi to tdlib
-// TODO: handle multimedia
 
 func main() {
 	config.Load()

@@ -54,8 +54,6 @@ func (b *Bot) handleFromFetcher(ctx context.Context, update tgbotapi.Update) err
 		return nil
 	}
 
-	b.tryUpdateChannelName(ctx, chatID, update.Message.ForwardFromChat.UserName)
-
 	if update.Message.MediaGroupID != "" {
 		mediaGroup, _ := strconv.ParseInt(
 			update.Message.MediaGroupID,
@@ -71,15 +69,45 @@ func (b *Bot) handleFromFetcher(ctx context.Context, update tgbotapi.Update) err
 		return nil
 	}
 
-	groups, err := b.db.GetSubsOfChannel(ctx, chatID)
+	go b.tryUpdateChannelName(ctx, chatID, update.Message.ForwardFromChat.UserName)
+
+	return b.forwardPostToSubs(
+		ctx,
+		chatID,
+		update.Message.Chat.ID,
+		&[]int{update.Message.MessageID},
+	)
+}
+
+func (b *Bot) forwardPostToSubs(ctx context.Context, channelID int64, fetcherID int64, messageIDs *[]int, additional ...string) error {
+	if len(*messageIDs) == 0 {
+		return errors.New("no messages to forward")
+	}
+
+	groups, err := b.db.GetSubsOfChannel(ctx, channelID)
 	if err != nil {
 		return err
 	}
 
 	for _, group := range groups {
-		_, err := b.api.Send(tgbotapi.NewForward(group, update.Message.Chat.ID, update.Message.MessageID))
-		if err != nil {
-			log.Printf("Error sending forward from channel %v to group %v: %v", chatID, group, err)
+		if len(additional) != 0 {
+			_, err = b.api.Send(tgbotapi.NewMessage(group, additional[0]))
+			if err != nil {
+				log.Printf("Error sending additional mesasge to group %v: %v", group, err)
+				continue
+			}
+		}
+
+		if len(*messageIDs) == 1 {
+			_, err := b.api.Send(tgbotapi.NewForward(group, fetcherID, (*messageIDs)[0]))
+			if err != nil {
+				log.Printf("Error sending forward from channel %v to group %v: %v", channelID, group, err)
+			}
+		} else {
+			err := b.forwardMessages(group, fetcherID, messageIDs)
+			if err != nil {
+				log.Printf("Error sending forward from channel %v to group %v: %v", channelID, group, err)
+			}
 		}
 	}
 	return nil
@@ -118,30 +146,20 @@ func (b *Bot) handleConfigMessage(update tgbotapi.Update) error {
 	}
 }
 
-func (b *Bot) tryHandleEdit(ctx context.Context, update tgbotapi.Update, msgCfg tools.MessageConfig, chatID int64) (bool, error) {
+func (b *Bot) tryHandleEdit(ctx context.Context, update tgbotapi.Update, msgCfg tools.MessageConfig, channelID int64) (bool, error) {
 	b.channelEdit.Mutex.Lock()
 	if channelName, ok := b.channelEdit.List[msgCfg]; ok {
 		delete(b.channelEdit.List, msgCfg)
 		b.channelEdit.Mutex.Unlock()
 
-		groups, err := b.db.GetSubsOfChannel(ctx, chatID)
-		if err != nil {
-			return true, err
-		}
-
-		for _, group := range groups {
-			_, err = b.api.Send(tgbotapi.NewMessage(group, "@"+channelName+" отредактировал сообщение:"))
-			if err != nil {
-				log.Printf("Error sending edited post from channel %v to group %v: %v", chatID, group, err)
-				continue
-			}
-
-			_, err = b.api.Send(tgbotapi.NewForward(group, update.Message.Chat.ID, update.Message.MessageID))
-			if err != nil {
-				log.Printf("Error sending edited post from channel %v to group %v: %v", chatID, group, err)
-			}
-		}
-		return true, nil
+		err := b.forwardPostToSubs(
+			ctx,
+			channelID,
+			update.Message.Chat.ID,
+			&[]int{update.Message.MessageID},
+			"@"+channelName+" отредактировал сообщение:",
+		)
+		return true, err
 	} else {
 		b.channelEdit.Mutex.Unlock()
 		return false, nil
@@ -155,7 +173,14 @@ func (b *Bot) tryHandleRepost(ctx context.Context, update tgbotapi.Update, msgCf
 		b.channelReposts.Mutex.Unlock()
 
 		for _, target := range targets {
-			groups, err := b.db.GetSubsOfChannel(ctx, target.ChannelID)
+			err := b.forwardPostToSubs(
+				ctx,
+				target.ChannelID,
+				update.Message.Chat.ID,
+				&[]int{update.Message.MessageID},
+				"@"+target.ChannelName+" переслал сообщение:",
+			)
+
 			if err != nil {
 				if len(targets) > 0 {
 					log.Printf(
@@ -176,19 +201,6 @@ func (b *Bot) tryHandleRepost(ctx context.Context, update tgbotapi.Update, msgCf
 							err,
 						),
 					)
-				}
-			}
-
-			for _, group := range groups {
-				_, err = b.api.Send(tgbotapi.NewMessage(group, "@"+target.ChannelName+" переслал сообщение:"))
-				if err != nil {
-					log.Printf("Error sending repost from channel %v to group %v: %v", chatID, group, err)
-					continue
-				}
-
-				_, err = b.api.Send(tgbotapi.NewForward(group, update.Message.Chat.ID, update.Message.MessageID))
-				if err != nil {
-					log.Printf("Error sending repost from channel %v to group %v: %v", chatID, group, err)
 				}
 			}
 		}

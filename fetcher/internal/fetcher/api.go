@@ -21,6 +21,34 @@ func (f *Fetcher) SubscribeToChannel(ctx context.Context, channelName string) (i
 	return channelID, accessHash, err
 }
 
+func (f *Fetcher) UnsubscribeFromChannel(ctx context.Context, channelID int64) error {
+	channelInfo, err := f.client.API().ChannelsGetChannels(ctx, []tg.InputChannelClass{
+		&tg.InputChannel{ChannelID: channelID},
+	})
+	if err != nil {
+		return err
+	}
+	chat, ok := channelInfo.(*tg.MessagesChats)
+	if !ok {
+		return errors.New(fmt.Sprintf("can't unsubscribe from channelInfo: invalid chat type: %T", channelInfo))
+	}
+	if len(chat.Chats) == 0 {
+		return errors.New("can't unsubscribe from channelInfo: invalid chat type: 0 chats")
+	}
+	channel, ok := chat.Chats[0].(*tg.Channel)
+	if !ok {
+		return errors.New(fmt.Sprintf("can't unsubscribe from channelInfo: invalid chat type: %T", chat.Chats[0]))
+	}
+	_, err = f.client.API().ChannelsLeaveChannel(
+		ctx,
+		&tg.InputChannel{
+			ChannelID:  channelID,
+			AccessHash: channel.AccessHash,
+		},
+	)
+	return err
+}
+
 // GetChannelInfo returns channel's id, access hash, can you forward from it and error (in this order)
 func (f *Fetcher) GetChannelInfo(ctx context.Context, channelName string) (int64, int64, bool, error) {
 	res, err := f.client.API().ContactsResolveUsername(ctx, channelName)

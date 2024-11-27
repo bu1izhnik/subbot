@@ -26,3 +26,8 @@ WHERE subs.chat = $1;
 SELECT COUNT(1)
 FROM channels
 WHERE id = $1;
+
+-- name: GetChannelsFetcher :one
+SELECT fetchers.ip, fetchers.port FROM fetchers
+JOIN channels ON channels.stored_at = fetchers.id
+WHERE channels.id = $1;

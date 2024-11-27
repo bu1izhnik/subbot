@@ -14,3 +14,7 @@ WHERE channel = $1;
 -- name: GroupIDChanged :exec
 UPDATE subs SET chat = $2
 WHERE chat = $1;
+
+-- name: CountSubsOfChannel :one
+SELECT COUNT(*) FROM subs
+WHERE channel = $1;

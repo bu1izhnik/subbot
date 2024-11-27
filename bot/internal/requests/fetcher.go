@@ -58,3 +58,19 @@ func SubscribeToChannel(reqURL string) (*ChannelData, error) {
 	}
 	return &channel, nil
 }
+
+func UnsubscribeFromChannel(reqURL string) error {
+	req, err := http.NewRequest(http.MethodDelete, reqURL, nil)
+	if err != nil {
+		return err
+	}
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	if res.StatusCode != http.StatusOK {
+		return errors.New("could not unsubscribe from channel")
+	}
+	return nil
+}

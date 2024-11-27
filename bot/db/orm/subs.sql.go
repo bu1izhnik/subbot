@@ -9,6 +9,18 @@ import (
 	"context"
 )
 
+const countSubsOfChannel = `-- name: CountSubsOfChannel :one
+SELECT COUNT(*) FROM subs
+WHERE channel = $1
+`
+
+func (q *Queries) CountSubsOfChannel(ctx context.Context, channel int64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countSubsOfChannel, channel)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const getSubsOfChannel = `-- name: GetSubsOfChannel :many
 SELECT chat FROM subs
 WHERE channel = $1

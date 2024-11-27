@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/BulizhnikGames/subbot/bot/db/orm"
+	"github.com/BulizhnikGames/subbot/bot/internal/requests"
 	"github.com/BulizhnikGames/subbot/bot/tools"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"strconv"
@@ -74,7 +75,8 @@ func Del(db *orm.Queries) tools.Command {
 			)
 		}
 
-		channelID, err := strconv.ParseInt(callbackData[2], 10, 64)
+		channelIDStr := callbackData[2]
+		channelID, err := strconv.ParseInt(channelIDStr, 10, 64)
 		channelName := tools.GetChannelUsername(callbackData[3])
 
 		if channelID == 0 {
@@ -84,6 +86,47 @@ func Del(db *orm.Queries) tools.Command {
 				"Команда отменена",
 			)
 			return err
+		}
+
+		subCnt, err := db.CountSubsOfChannel(ctx, channelID)
+		if err != nil {
+			tools.ResponseToCallbackLogError(
+				api,
+				update,
+				"Не вышло отписаться от канала: internal error.",
+			)
+			return err
+		}
+
+		if subCnt == 1 {
+			fetcher, err := db.GetChannelsFetcher(ctx, channelID)
+			if err != nil {
+				tools.ResponseToCallbackLogError(
+					api,
+					update,
+					"Не вышло отписаться от канала: internal error.",
+				)
+				return err
+			}
+			requestURL := "http://" + fetcher.Ip + ":" + fetcher.Port + "/" + channelIDStr
+			err = requests.UnsubscribeFromChannel(requestURL)
+			if err != nil {
+				tools.ResponseToCallbackLogError(
+					api,
+					update,
+					"Не вышло отписаться от канала: internal error.",
+				)
+				return err
+			}
+			err = db.DeleteChannel(ctx, channelID)
+			if err != nil {
+				tools.ResponseToCallbackLogError(
+					api,
+					update,
+					"Не вышло отписаться от канала: internal error.",
+				)
+				return err
+			}
 		}
 
 		err = db.UnSubscribe(ctx, orm.UnSubscribeParams{

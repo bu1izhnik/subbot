@@ -2,6 +2,8 @@
 session.json
 logs/
 /logs/
+fetcher_main
+fetcher_main.exe
 main
 main.exe
 updates.bolt.db

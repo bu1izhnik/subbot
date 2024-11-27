@@ -95,6 +95,24 @@ func (q *Queries) DeleteChannel(ctx context.Context, id int64) error {
 	return err
 }
 
+const getChannelsFetcher = `-- name: GetChannelsFetcher :one
+SELECT fetchers.ip, fetchers.port FROM fetchers
+JOIN channels ON channels.stored_at = fetchers.id
+WHERE channels.id = $1
+`
+
+type GetChannelsFetcherRow struct {
+	Ip   string
+	Port string
+}
+
+func (q *Queries) GetChannelsFetcher(ctx context.Context, id int64) (GetChannelsFetcherRow, error) {
+	row := q.db.QueryRowContext(ctx, getChannelsFetcher, id)
+	var i GetChannelsFetcherRow
+	err := row.Scan(&i.Ip, &i.Port)
+	return i, err
+}
+
 const getGroupSubs = `-- name: GetGroupSubs :many
 SELECT channels.id, channels.username FROM channels
 JOIN subs ON channels.id = subs.channel

@@ -4,6 +4,7 @@ import (
 	"github.com/BulizhnikGames/subbot/fetcher/internal/fetcher"
 	"github.com/go-chi/chi/v5"
 	"net/http"
+	"strconv"
 )
 
 type channelData struct {
@@ -21,6 +22,7 @@ func Init(f *fetcher.Fetcher, port string) *Api {
 	api := &Api{f: f}
 	router := chi.NewRouter()
 	router.Post("/{channelName}", api.handleSubscribe)
+	router.Delete("/{channelID}", api.handleUnsubscribe)
 	router.Get("/{channelName}", api.handleGetChannelInfo)
 	api.server = &http.Server{
 		Handler: router,
@@ -46,6 +48,22 @@ func (api *Api) handleSubscribe(w http.ResponseWriter, r *http.Request) {
 		ChannelID:  channelID,
 		AccessHash: accessHash,
 	})
+}
+
+func (api *Api) handleUnsubscribe(w http.ResponseWriter, r *http.Request) {
+	channelIDStr := chi.URLParam(r, "channelID")
+	channelID, err := strconv.ParseInt(channelIDStr, 10, 64)
+	if err != nil {
+		responseWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	err = api.f.UnsubscribeFromChannel(r.Context(), channelID)
+	if err != nil {
+		responseWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	responseWithJSON(w, http.StatusOK, "success")
 }
 
 func (api *Api) handleGetChannelInfo(w http.ResponseWriter, r *http.Request) {

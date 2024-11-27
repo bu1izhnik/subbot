@@ -26,26 +26,21 @@ func GetValuesFromEditConfig(cfg string) (*MessageConfig, string, error) {
 }
 
 // String must contain just data separated by spaces
-func GetValuesFromRepostConfig(cfg string) (*MessageConfig, *RepostedTo, error) {
+func GetValuesFromRepostConfig(cfg string) (*Repost, error) {
 	data := strings.Split(cfg, " ")
-	if len(data) != 4 {
-		return nil, nil, errors.New("invalid repost config")
+	if len(data) != 3 {
+		return nil, errors.New("invalid repost config")
 	}
-	msgCfg := &MessageConfig{}
-	repTo := &RepostedTo{}
+	rep := &Repost{}
 	var err error
-	msgCfg.ChannelID, err = strconv.ParseInt(data[0], 10, 64)
+	rep.ChannelID, err = strconv.ParseInt(data[0], 10, 64)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	msgCfg.MessageID, err = strconv.Atoi(data[1])
+	rep.ChannelName = data[1]
+	rep.Cnt, err = strconv.Atoi(data[2])
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	repTo.ChannelID, err = strconv.ParseInt(data[2], 10, 64)
-	if err != nil {
-		return nil, nil, err
-	}
-	repTo.ChannelName = data[3]
-	return msgCfg, repTo, nil
+	return rep, nil
 }

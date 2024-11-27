@@ -19,14 +19,21 @@ type FetcherParams struct {
 	Port string
 }
 
+// MessageConfig Ether GroupID ot MessageID will be 0 (first if multiple messages, otherwise - second)
 type MessageConfig struct {
 	ChannelID int64
 	MessageID int
+	GroupID   int64
 }
 
 type RepostedTo struct {
 	ChannelID   int64
 	ChannelName string
+}
+
+type Repost struct {
+	RepostedTo
+	Cnt int
 }
 
 type RateLimitConfig struct {
@@ -40,6 +47,7 @@ type MultiMediaConfig struct {
 	IDs             [10]int
 	Cnt             int
 	GotMaxMedia     chan struct{}
+	WasRepost       chan struct{}
 }
 
 type GetFetcherRequest func(ctx context.Context, db *orm.Queries) (*FetcherParams, error)

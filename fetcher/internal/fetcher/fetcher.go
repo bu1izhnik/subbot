@@ -6,6 +6,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	lj "gopkg.in/natefinch/lumberjack.v2"
+	"math/rand"
 	"sync"
 
 	"bufio"
@@ -17,7 +18,6 @@ import (
 	"github.com/gotd/td/telegram/updates"
 	"github.com/gotd/td/tg"
 	"log"
-	"math/rand"
 	"net/http"
 	"os"
 	"strconv"
@@ -193,29 +193,7 @@ func (f *Fetcher) tick(ctx context.Context, interval time.Duration) {
 				AccessHash: f.botHash,
 			}
 
-			if send.edit != nil {
-				_, err := f.client.API().MessagesSendMessage(ctx, &tg.MessagesSendMessageRequest{
-					Peer:     botPeer,
-					Message:  fmt.Sprintf("e %v %v %s", send.edit.channelID, send.edit.messageID, send.edit.channelName),
-					RandomID: int64(rand.Int31()),
-				})
-				if err != nil {
-					log.Printf("Error sending support message for edit: %v", err)
-					continue
-				}
-			} else if send.repost != nil {
-				_, err := f.client.API().MessagesSendMessage(ctx, &tg.MessagesSendMessageRequest{
-					Peer:     botPeer,
-					Message:  fmt.Sprintf("r %v %v %v %s", send.repost.fromID, send.repost.messageID, send.repost.toID, send.repost.toName),
-					RandomID: int64(rand.Int31()),
-				})
-				if err != nil {
-					log.Printf("Error sending support message for repost: %v", err)
-					continue
-				}
-			}
-
-			_, err := f.client.API().MessagesForwardMessages(ctx, &tg.MessagesForwardMessagesRequest{
+			gotForwardUpdate, err := f.client.API().MessagesForwardMessages(ctx, &tg.MessagesForwardMessagesRequest{
 				FromPeer: &tg.InputPeerChannel{
 					ChannelID:  send.forward.channelID,
 					AccessHash: send.forward.accessHash,
@@ -230,7 +208,93 @@ func (f *Fetcher) tick(ctx context.Context, interval time.Duration) {
 					send.forward.channelID,
 					err,
 				)
+				continue
 			}
+
+			f.client.API()
+
+			if send.repost != nil {
+				forwardUpdate, ok := gotForwardUpdate.(*tg.Updates)
+				if !ok {
+					log.Printf("Got incorrect type of update from forwarding: %T", gotForwardUpdate)
+					continue
+				}
+
+				maxID := 0
+				cnt := 0
+				for _, update := range forwardUpdate.Updates {
+					//log.Printf("%T", update)
+					messageUpdate, ok := update.(*tg.UpdateMessageID)
+					if ok {
+						//log.Printf("%+v", messageUpdate)
+						maxID = max(maxID, messageUpdate.ID)
+						cnt++
+					}
+				}
+				startID := maxID - cnt + 1
+
+				_, err = f.client.API().MessagesSendMessage(ctx, &tg.MessagesSendMessageRequest{
+					Peer: botPeer,
+					/*Message: fmt.Sprintf(
+						"r %v %v %s%s",
+						send.repost.fromID,
+						send.repost.toID,
+						send.repost.toName,
+						IDs.String(),
+					),*/
+					Message: fmt.Sprintf(
+						"r %v %s %v",
+						send.repost.toID,
+						send.repost.toName,
+						cnt,
+					),
+					ReplyTo: &tg.InputReplyToMessage{
+						ReplyToMsgID: startID,
+					},
+					RandomID: int64(rand.Int31()),
+				})
+				if err != nil {
+					log.Printf("Error forwarding repost config: %v", err)
+				}
+			}
+
+			/*if send.edit != nil {
+				_, err := f.client.API().MessagesSendMessage(ctx, &tg.MessagesSendMessageRequest{
+					Peer: botPeer,
+					Message: fmt.Sprintf("e %v %v %s",
+						send.edit.channelID,
+						send.edit.messageID,
+						send.edit.channelName,
+					),
+					RandomID: int64(rand.Int31()),
+				})
+				if err != nil {
+					log.Printf("Error sending support message for edit: %v", err)
+					continue
+				}
+			} else if send.repost != nil {
+				IDs := strings.Builder{}
+				for _, id := range send.repost.messageIDs {
+					IDs.WriteString(" " + strconv.Itoa(id))
+				}
+				_, err := f.client.API().MessagesSendMessage(ctx, &tg.MessagesSendMessageRequest{
+					Peer: botPeer,
+					Message: fmt.Sprintf(
+						"r %v %v %s%s %v",
+						send.repost.fromID,
+						send.repost.toID,
+						send.repost.toName,
+						IDs.String(),
+						len(send.repost.messageIDs),
+					),
+					RandomID: int64(rand.Int31()),
+				})
+				if err != nil {
+					log.Printf("Error sending support message for repost: %v", err)
+					continue
+				}
+			}*/
+
 		case <-ctx.Done():
 			return
 		}

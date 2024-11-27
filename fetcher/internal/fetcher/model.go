@@ -25,9 +25,9 @@ type editConfig struct {
 // This config sends to main bot when there is need to handle repost
 type repostConfig struct {
 	// ID of channel from which repost was done
-	fromID int64
+	//fromID int64
 	// ID of message in channel from which repost was done
-	messageID int
+	//messageIDs []int
 	// ID of channel which reposted
 	toID int64
 	// Name of channel which reposted

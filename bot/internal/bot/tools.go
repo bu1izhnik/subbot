@@ -36,7 +36,7 @@ func (b *Bot) tryUpdateChannelName(ctx context.Context, channelID int64, channel
 
 func (b *Bot) removeGarbageData() {
 	b.channelReposts.Mutex.Lock()
-	b.channelReposts.List = make(map[tools.MessageConfig][]tools.RepostedTo)
+	b.channelReposts.List = make(map[tools.MessageConfig][]tools.Repost)
 	b.channelReposts.Mutex.Unlock()
 
 	b.channelEdit.Mutex.Lock()
@@ -98,19 +98,21 @@ func (b *Bot) queueMultiMedia(messageID int, channelID int64, fetcherChatID int6
 		b.multiMediaQueue.Mutex.Unlock()
 	} else {
 		sendChan := make(chan struct{})
+		abortChan := make(chan struct{})
 		b.multiMediaQueue.List[groupID] = &tools.MultiMediaConfig{
 			FromFetcherChat: fetcherChatID,
 			FromChannel:     channelID,
 			IDs:             [10]int{messageID},
 			Cnt:             1,
 			GotMaxMedia:     sendChan,
+			WasRepost:       abortChan,
 		}
-		go b.waitToForwardMultimedia(groupID, sendChan)
+		go b.waitToForwardMultimedia(groupID, sendChan, abortChan)
 		b.multiMediaQueue.Mutex.Unlock()
 	}
 }
 
-func (b *Bot) waitToForwardMultimedia(groupID int64, send <-chan struct{}) {
+func (b *Bot) waitToForwardMultimedia(groupID int64, send <-chan struct{}, abort <-chan struct{}) {
 	log.Printf("waitToForward")
 	timer := time.NewTimer(b.maxMultiMediaWaitTime)
 
@@ -119,6 +121,11 @@ func (b *Bot) waitToForwardMultimedia(groupID int64, send <-chan struct{}) {
 		b.forwardMultimedia(groupID)
 	case <-timer.C:
 		b.forwardMultimedia(groupID)
+	case <-abort:
+		b.multiMediaQueue.Mutex.Lock()
+		log.Printf("abort")
+		delete(b.multiMediaQueue.List, groupID)
+		b.multiMediaQueue.Mutex.Unlock()
 	}
 }
 

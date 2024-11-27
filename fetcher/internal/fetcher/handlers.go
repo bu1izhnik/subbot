@@ -2,8 +2,6 @@ package fetcher
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"github.com/gotd/td/tg"
 	"log"
 )
@@ -15,18 +13,6 @@ func (f *Fetcher) handleNewMessage(ctx context.Context, update *tg.UpdateNewChan
 		return err
 	}
 
-	if msg.GroupedID != 0 {
-		f.multiMediaQueue.Mutex.Lock()
-		if f.multiMediaQueue.List[msg.GroupedID] != nil {
-			f.multiMediaQueue.List[msg.GroupedID].forward.messageIDs =
-				append(f.multiMediaQueue.List[msg.GroupedID].forward.messageIDs, msg.ID)
-			log.Printf("Added new photo to group: %v", msg.GroupedID)
-			f.multiMediaQueue.Mutex.Unlock()
-			return nil
-		}
-		f.multiMediaQueue.Mutex.Unlock()
-	}
-
 	var repostCfg *repostConfig
 	forwardCfg := &forwardConfig{
 		channelID:  channel.ID,
@@ -34,7 +20,7 @@ func (f *Fetcher) handleNewMessage(ctx context.Context, update *tg.UpdateNewChan
 		messageIDs: []int{msg.ID},
 	}
 
-	if fwd, ok := msg.GetFwdFrom(); ok {
+	/*if fwd, ok := msg.GetFwdFrom(); ok {
 		var originalChatID int64
 		originalMessageID := fwd.ChannelPost
 		// No chat peer support now
@@ -49,30 +35,37 @@ func (f *Fetcher) handleNewMessage(ctx context.Context, update *tg.UpdateNewChan
 		}
 
 		repostCfg = &repostConfig{
-			fromID:    originalChatID,
-			messageID: originalMessageID,
-			toID:      channel.ID,
-			toName:    channel.Username,
+			//fromID: originalChatID,
+			//messageIDs: []int{originalMessageID},
+			toID:   channel.ID,
+			toName: channel.Username,
 		}
+	}*/
+
+	if _, ok := msg.GetFwdFrom(); ok {
+		repostCfg = &repostConfig{
+			//fromID: originalChatID,
+			//messageIDs: []int{originalMessageID},
+			toID:   channel.ID,
+			toName: channel.Username,
+		}
+	}
+
+	sendCfg := sendConfig{
+		repost:  repostCfg,
+		forward: forwardCfg,
+		edit:    nil,
 	}
 
 	if msg.GroupedID != 0 {
 		f.handleMultimedia(
 			msg.GroupedID,
-			&sendConfig{
-				repost:  repostCfg,
-				forward: forwardCfg,
-				edit:    nil,
-			},
+			&sendCfg,
 		)
 		return nil
 	}
 
-	f.sendChan <- &sendConfig{
-		repost:  repostCfg,
-		forward: forwardCfg,
-		edit:    nil,
-	}
+	f.sendChan <- &sendCfg
 
 	return nil
 }
@@ -80,9 +73,13 @@ func (f *Fetcher) handleNewMessage(ctx context.Context, update *tg.UpdateNewChan
 func (f *Fetcher) handleMultimedia(groupID int64, sendCfg *sendConfig) {
 	f.multiMediaQueue.Mutex.Lock()
 	if f.multiMediaQueue.List[groupID] != nil {
-		log.Printf("Added new photo to group: %v", groupID)
 		f.multiMediaQueue.List[groupID].forward.messageIDs =
 			append(f.multiMediaQueue.List[groupID].forward.messageIDs, sendCfg.forward.messageIDs...)
+		/*if f.multiMediaQueue.List[groupID].repost != nil {
+			f.multiMediaQueue.List[groupID].repost.messageIDs =
+				append(f.multiMediaQueue.List[groupID].repost.messageIDs, sendCfg.repost.messageIDs...)
+		}*/
+		log.Printf("Added new photo to group: %v", groupID)
 		f.multiMediaQueue.Mutex.Unlock()
 	} else {
 		f.multiMediaQueue.List[groupID] = sendCfg

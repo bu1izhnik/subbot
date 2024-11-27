@@ -15,8 +15,13 @@ func (b *Bot) handleFromFetcher(ctx context.Context, update tgbotapi.Update) err
 		return errors.New("message is not from fetcher: message empty")
 	}
 
+	/*log.Printf("%v", update.Message.MessageID)
+	if update.Message.ReplyToMessage != nil {
+		log.Printf("reply to id: %v", update.Message.ReplyToMessage.MessageID)
+	}*/
+
 	if update.Message.ForwardFromChat == nil && update.Message.ForwardFrom == nil {
-		return b.handleConfigMessage(update)
+		return b.handleConfigMessage(ctx, update)
 	}
 
 	var chatID int64
@@ -32,13 +37,13 @@ func (b *Bot) handleFromFetcher(ctx context.Context, update tgbotapi.Update) err
 		log.Printf("User: ID: %v, Name: %s", chatID, update.Message.ForwardFrom.UserName)
 	}
 
-	forwardMessageID := update.Message.ForwardFromMessageID
+	/*forwardMessageID := update.Message.ForwardFromMessageID
 	msgCfg := tools.MessageConfig{
 		ChannelID: chatID,
 		MessageID: forwardMessageID,
-	}
+	}*/
 
-	ok, err := b.tryHandleEdit(ctx, update, msgCfg, chatID)
+	/*ok, err := b.tryHandleEdit(ctx, update, msgCfg, chatID)
 	if err != nil {
 		return err
 	}
@@ -52,7 +57,7 @@ func (b *Bot) handleFromFetcher(ctx context.Context, update tgbotapi.Update) err
 	}
 	if ok {
 		return nil
-	}
+	}*/
 
 	if update.Message.MediaGroupID != "" {
 		mediaGroup, _ := strconv.ParseInt(
@@ -113,21 +118,43 @@ func (b *Bot) forwardPostToSubs(ctx context.Context, channelID int64, fetcherID 
 	return nil
 }
 
-func (b *Bot) handleConfigMessage(update tgbotapi.Update) error {
-	if len(update.Message.Text) > 2 {
-		if update.Message.Text[0] == 'r' { // got repost message config (ex: "r cID1 mID2 cID3 username")
-			cfg, rep, err := tools.GetValuesFromRepostConfig(update.Message.Text[2:])
+func (b *Bot) handleConfigMessage(ctx context.Context, update tgbotapi.Update) error {
+	if len(update.Message.Text) > 2 || update.Message.ReplyToMessage != nil {
+		if update.Message.Text[0] == 'r' { // got repost message config (ex: "r channelID username messageCnt")
+			/*cfg, rep, err := tools.GetValuesFromRepostConfig(update.Message.Text[2:])
 			if err != nil {
 				return err
 			}
 			b.channelReposts.Mutex.Lock()
 			if b.channelReposts.List[*cfg] == nil {
-				b.channelReposts.List[*cfg] = make([]tools.RepostedTo, 0)
+				b.channelReposts.List[*cfg] = make([]tools.Repost, 0)
 			}
 			b.channelReposts.List[*cfg] = append(b.channelReposts.List[*cfg], *rep)
 			//log.Printf("added to reposts from: %+v to: %+v (%v)", *cfg, *rep, len(b.channelReposts.reposts[*cfg]))
 			b.channelReposts.Mutex.Unlock()
-			return nil
+			return nil*/
+			rep, err := tools.GetValuesFromRepostConfig(update.Message.Text[2:])
+			if err != nil {
+				return err
+			}
+			groupID, err := strconv.ParseInt(update.Message.ReplyToMessage.MediaGroupID, 10, 64)
+			if err != nil {
+				return err
+			}
+			b.multiMediaQueue.Mutex.Lock()
+			b.multiMediaQueue.List[groupID].WasRepost <- struct{}{}
+			b.multiMediaQueue.Mutex.Unlock()
+			IDs := make([]int, rep.Cnt)
+			for i := 0; i < rep.Cnt; i++ {
+				IDs[i] = update.Message.ReplyToMessage.MessageID + i
+			}
+			return b.forwardPostToSubs(
+				ctx,
+				rep.ChannelID,
+				update.Message.Chat.ID,
+				&IDs,
+				"@"+rep.ChannelName+" переслал сообщение:",
+			)
 		} else if update.Message.Text[0] == 'e' { // got edit message config (ex: "e cID1 mID2 username")
 			cfg, channelName, err := tools.GetValuesFromEditConfig(update.Message.Text[2:])
 			if err != nil {

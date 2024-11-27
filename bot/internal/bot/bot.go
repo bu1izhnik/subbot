@@ -21,7 +21,7 @@ type Bot struct {
 	callbacks map[string]tools.Command
 
 	// key is message which was reposted and value is channels to which it was reposted
-	channelReposts tools.AsyncMap[tools.MessageConfig, []tools.RepostedTo]
+	channelReposts tools.AsyncMap[tools.MessageConfig, []tools.Repost]
 	// key is message which was edited and value is username of channel
 	channelEdit tools.AsyncMap[tools.MessageConfig, string]
 	// key is id of user and value is his message count per last interval of checks and his ban time of exists
@@ -50,8 +50,8 @@ func Init(api *tgbotapi.BotAPI,
 		commands:  make(map[string]tools.Command),
 		callbacks: make(map[string]tools.Command),
 
-		channelReposts: tools.AsyncMap[tools.MessageConfig, []tools.RepostedTo]{
-			List:  make(map[tools.MessageConfig][]tools.RepostedTo),
+		channelReposts: tools.AsyncMap[tools.MessageConfig, []tools.Repost]{
+			List:  make(map[tools.MessageConfig][]tools.Repost),
 			Mutex: sync.Mutex{},
 		},
 		channelEdit: tools.AsyncMap[tools.MessageConfig, string]{

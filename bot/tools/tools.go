@@ -33,3 +33,11 @@ func GetChannelUsername(username string) string {
 	}
 	return username
 }
+
+func GetIDs(start int, cnt int) *[]int {
+	ids := make([]int, cnt)
+	for i := 0; i < cnt; i++ {
+		ids[i] = start + i
+	}
+	return &ids
+}

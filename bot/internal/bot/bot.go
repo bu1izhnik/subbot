@@ -20,19 +20,12 @@ type Bot struct {
 	commands  map[string]tools.Command
 	callbacks map[string]tools.Command
 
-	// key is message which was reposted and value is channels to which it was reposted
-	channelReposts tools.AsyncMap[tools.MessageConfig, []tools.Repost]
-	// key is message which was edited and value is username of channel
-	channelEdit tools.AsyncMap[tools.MessageConfig, string]
 	// key is id of user and value is his message count per last interval of checks and his ban time of exists
 	usersLimits tools.AsyncMap[int64, *tools.RateLimitConfig]
-	// key is group id of multimedia and value is messages to forward
-	multiMediaQueue tools.AsyncMap[int64, *tools.MultiMediaConfig]
 
 	config.RateLimitConfig
 
 	checkRateLimits       <-chan time.Time
-	removeGarbage         <-chan time.Time
 	maxMultiMediaWaitTime time.Duration
 	timeout               time.Duration
 }
@@ -40,7 +33,6 @@ type Bot struct {
 func Init(api *tgbotapi.BotAPI,
 	db *orm.Queries,
 	timeout time.Duration,
-	garbageTimeout time.Duration,
 	rateLimitCfg config.RateLimitConfig,
 	multiMediaWaitTime time.Duration) *Bot {
 	return &Bot{
@@ -50,27 +42,14 @@ func Init(api *tgbotapi.BotAPI,
 		commands:  make(map[string]tools.Command),
 		callbacks: make(map[string]tools.Command),
 
-		channelReposts: tools.AsyncMap[tools.MessageConfig, []tools.Repost]{
-			List:  make(map[tools.MessageConfig][]tools.Repost),
-			Mutex: sync.Mutex{},
-		},
-		channelEdit: tools.AsyncMap[tools.MessageConfig, string]{
-			List:  make(map[tools.MessageConfig]string),
-			Mutex: sync.Mutex{},
-		},
 		usersLimits: tools.AsyncMap[int64, *tools.RateLimitConfig]{
 			List:  make(map[int64]*tools.RateLimitConfig),
-			Mutex: sync.Mutex{},
-		},
-		multiMediaQueue: tools.AsyncMap[int64, *tools.MultiMediaConfig]{
-			List:  make(map[int64]*tools.MultiMediaConfig),
 			Mutex: sync.Mutex{},
 		},
 
 		RateLimitConfig: rateLimitCfg,
 
 		checkRateLimits:       time.NewTicker(time.Duration(rateLimitCfg.RateLimitCheckInterval) * time.Second).C,
-		removeGarbage:         time.NewTicker(garbageTimeout).C,
 		maxMultiMediaWaitTime: multiMediaWaitTime,
 		timeout:               timeout,
 	}
@@ -93,8 +72,6 @@ func (b *Bot) Run() {
 
 	for {
 		select {
-		case <-b.removeGarbage:
-			go b.removeGarbageData()
 		case <-b.checkRateLimits:
 			go b.checkForRateLimits()
 		case update := <-updates:

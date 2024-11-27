@@ -15,6 +15,7 @@ import (
 )
 
 // TODO: improve error handling
+// TODO: forward posts to specific threads
 
 func main() {
 	config.Load()
@@ -40,7 +41,6 @@ func main() {
 		tgBotApi,
 		dbOrm,
 		4*time.Second,
-		30*time.Minute,
 		cfg.RateLimitConfig,
 		2*time.Second,
 	)

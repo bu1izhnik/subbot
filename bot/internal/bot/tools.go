@@ -11,7 +11,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -32,16 +31,6 @@ func (b *Bot) tryUpdateChannelName(ctx context.Context, channelID int64, channel
 	}); err != nil {
 		log.Printf("Error changing channel (%v) name to %v: %v", channelID, channelName, err)
 	}
-}
-
-func (b *Bot) removeGarbageData() {
-	b.channelReposts.Mutex.Lock()
-	b.channelReposts.List = make(map[tools.MessageConfig][]tools.Repost)
-	b.channelReposts.Mutex.Unlock()
-
-	b.channelEdit.Mutex.Lock()
-	b.channelEdit.List = make(map[tools.MessageConfig]string)
-	b.channelEdit.Mutex.Unlock()
 }
 
 // IncreaseMsgCountForUser Returns true if user still not limited
@@ -82,80 +71,6 @@ func (b *Bot) checkForRateLimits() {
 		} else {
 			b.usersLimits.List[userID].MsgCnt = 0
 		}
-	}
-}
-
-func (b *Bot) queueMultiMedia(messageID int, channelID int64, fetcherChatID int64, groupID int64) {
-	log.Printf("queueMultimedia")
-	b.multiMediaQueue.Mutex.Lock()
-	if b.multiMediaQueue.List[groupID] != nil {
-		cnt := b.multiMediaQueue.List[groupID].Cnt
-		b.multiMediaQueue.List[groupID].IDs[cnt] = messageID
-		b.multiMediaQueue.List[groupID].Cnt++
-		if b.multiMediaQueue.List[groupID].Cnt == 10 {
-			b.multiMediaQueue.List[groupID].GotMaxMedia <- struct{}{}
-		}
-		b.multiMediaQueue.Mutex.Unlock()
-	} else {
-		sendChan := make(chan struct{})
-		abortChan := make(chan struct{})
-		b.multiMediaQueue.List[groupID] = &tools.MultiMediaConfig{
-			FromFetcherChat: fetcherChatID,
-			FromChannel:     channelID,
-			IDs:             [10]int{messageID},
-			Cnt:             1,
-			GotMaxMedia:     sendChan,
-			WasRepost:       abortChan,
-		}
-		go b.waitToForwardMultimedia(groupID, sendChan, abortChan)
-		b.multiMediaQueue.Mutex.Unlock()
-	}
-}
-
-func (b *Bot) waitToForwardMultimedia(groupID int64, send <-chan struct{}, abort <-chan struct{}) {
-	log.Printf("waitToForward")
-	timer := time.NewTimer(b.maxMultiMediaWaitTime)
-
-	select {
-	case <-send:
-		b.forwardMultimedia(groupID)
-	case <-timer.C:
-		b.forwardMultimedia(groupID)
-	case <-abort:
-		b.multiMediaQueue.Mutex.Lock()
-		log.Printf("abort")
-		delete(b.multiMediaQueue.List, groupID)
-		b.multiMediaQueue.Mutex.Unlock()
-	}
-}
-
-func (b *Bot) forwardMultimedia(groupID int64) {
-	b.multiMediaQueue.Mutex.Lock()
-	log.Printf("ForwardMultimedia")
-	channelID := b.multiMediaQueue.List[groupID].FromChannel
-	fetcherChatID := b.multiMediaQueue.List[groupID].FromFetcherChat
-	cnt := b.multiMediaQueue.List[groupID].Cnt
-	IDs := make([]int, cnt)
-	for i := 0; i < cnt; i++ {
-		IDs[i] = b.multiMediaQueue.List[groupID].IDs[i]
-	}
-	sort.Slice(
-		IDs,
-		func(i, j int) bool {
-			return IDs[i] < IDs[j]
-		},
-	)
-	delete(b.multiMediaQueue.List, groupID)
-	b.multiMediaQueue.Mutex.Unlock()
-
-	err := b.forwardPostToSubs(
-		context.Background(),
-		channelID,
-		fetcherChatID,
-		&IDs,
-	)
-	if err != nil {
-		log.Printf("Error forwarding multimedia: %v", err)
 	}
 }
 

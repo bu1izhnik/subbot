@@ -80,35 +80,6 @@ func Init(apiID int, apiHash string, botUsername string, mediaWait time.Duration
 		SessionStorage: &session,
 	})
 
-	// edit config temporarily turned off because of wierd behaviour
-	/*d.OnEditChannelMessage(func(ctx context.Context, e tg.Entities, update *tg.UpdateEditChannelMessage) error {
-		channel, msg, err := f.getChannelAndMessageInfo(ctx, update.Message)
-		if err != nil {
-			log.Printf("Error handling edited message in channel: %v", err)
-			return err
-		}
-
-		// If message has reply markup (ex: giveaway) it will be seen as edited each time someone presses button, same with reactions
-		if msg.ReplyMarkup != nil || len(msg.Reactions.Results) != 0 {
-			return nil
-		}
-
-		f.sendChan <- &sendConfig{
-			edit: &editConfig{
-				channelID:   channel.ID,
-				messageID:   msg.ID,
-				channelName: channel.Username,
-			},
-			forward: &forwardConfig{
-				channelID:  channel.ID,
-				accessHash: channel.AccessHash,
-				messageID:  msg.ID,
-			},
-			repost: nil,
-		}
-		return nil
-	})*/
-
 	d.OnNewChannelMessage(func(ctx context.Context, e tg.Entities, update *tg.UpdateNewChannelMessage) error {
 		go f.handleNewMessage(ctx, update)
 		return nil
@@ -211,37 +182,37 @@ func (f *Fetcher) tick(ctx context.Context, interval time.Duration) {
 				continue
 			}
 
-			f.client.API()
+			forwardUpdate, ok := gotForwardUpdate.(*tg.Updates)
+			if !ok {
+				log.Printf("Got incorrect type of update from forwarding: %T", gotForwardUpdate)
+				continue
+			}
 
-			if send.repost != nil {
-				forwardUpdate, ok := gotForwardUpdate.(*tg.Updates)
-				if !ok {
-					log.Printf("Got incorrect type of update from forwarding: %T", gotForwardUpdate)
-					continue
-				}
-
-				maxID := 0
-				cnt := 0
-				for _, update := range forwardUpdate.Updates {
-					//log.Printf("%T", update)
-					messageUpdate, ok := update.(*tg.UpdateMessageID)
+			messageSentNotAsForward := false
+			maxID := 0
+			cnt := 0
+			for _, update := range forwardUpdate.Updates {
+				switch messageUpdate := update.(type) {
+				case *tg.UpdateMessageID:
+					maxID = max(maxID, messageUpdate.ID)
+					cnt++
+				case *tg.UpdateNewMessage:
+					if messageSentNotAsForward {
+						continue
+					}
+					message, ok := messageUpdate.Message.(*tg.Message)
 					if ok {
-						//log.Printf("%+v", messageUpdate)
-						maxID = max(maxID, messageUpdate.ID)
-						cnt++
+						if _, ok := message.GetFwdFrom(); !ok {
+							messageSentNotAsForward = true
+						}
 					}
 				}
-				startID := maxID - cnt + 1
+			}
+			startID := maxID - cnt + 1
 
+			if send.repost != nil {
 				_, err = f.client.API().MessagesSendMessage(ctx, &tg.MessagesSendMessageRequest{
 					Peer: botPeer,
-					/*Message: fmt.Sprintf(
-						"r %v %v %s%s",
-						send.repost.fromID,
-						send.repost.toID,
-						send.repost.toName,
-						IDs.String(),
-					),*/
 					Message: fmt.Sprintf(
 						"r %v %s %v",
 						send.repost.toID,
@@ -251,50 +222,47 @@ func (f *Fetcher) tick(ctx context.Context, interval time.Duration) {
 					ReplyTo: &tg.InputReplyToMessage{
 						ReplyToMsgID: startID,
 					},
-					RandomID: int64(rand.Int31()),
+					RandomID: rand.Int63(),
 				})
 				if err != nil {
 					log.Printf("Error forwarding repost config: %v", err)
 				}
-			}
-
-			/*if send.edit != nil {
-				_, err := f.client.API().MessagesSendMessage(ctx, &tg.MessagesSendMessageRequest{
-					Peer: botPeer,
-					Message: fmt.Sprintf("e %v %v %s",
-						send.edit.channelID,
-						send.edit.messageID,
-						send.edit.channelName,
-					),
-					RandomID: int64(rand.Int31()),
-				})
-				if err != nil {
-					log.Printf("Error sending support message for edit: %v", err)
-					continue
-				}
-			} else if send.repost != nil {
-				IDs := strings.Builder{}
-				for _, id := range send.repost.messageIDs {
-					IDs.WriteString(" " + strconv.Itoa(id))
-				}
-				_, err := f.client.API().MessagesSendMessage(ctx, &tg.MessagesSendMessageRequest{
+			} else if send.edit != nil {
+				// Temporarily off
+				continue
+			} else if messageSentNotAsForward { // Message sent no as forward so it needs additional info about channel in config
+				_, err = f.client.API().MessagesSendMessage(ctx, &tg.MessagesSendMessageRequest{
 					Peer: botPeer,
 					Message: fmt.Sprintf(
-						"r %v %v %s%s %v",
-						send.repost.fromID,
-						send.repost.toID,
-						send.repost.toName,
-						IDs.String(),
-						len(send.repost.messageIDs),
+						"w %v %s %v",
+						send.forward.channelID,
+						send.forward.channelName,
+						cnt,
 					),
-					RandomID: int64(rand.Int31()),
+					ReplyTo: &tg.InputReplyToMessage{
+						ReplyToMsgID: startID,
+					},
+					RandomID: rand.Int63(),
 				})
 				if err != nil {
-					log.Printf("Error sending support message for repost: %v", err)
-					continue
+					log.Printf("Error forwarding weird post config: %v", err)
 				}
-			}*/
-
+			} else { // regular post
+				_, err = f.client.API().MessagesSendMessage(ctx, &tg.MessagesSendMessageRequest{
+					Peer: botPeer,
+					Message: fmt.Sprintf(
+						"p %v",
+						cnt,
+					),
+					ReplyTo: &tg.InputReplyToMessage{
+						ReplyToMsgID: startID,
+					},
+					RandomID: rand.Int63(),
+				})
+				if err != nil {
+					log.Printf("Error forwarding post config: %v", err)
+				}
+			}
 		case <-ctx.Done():
 			return
 		}

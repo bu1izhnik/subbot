@@ -7,23 +7,20 @@ import (
 )
 
 // GetValuesFromEditConfig String must contain just data separated by spaces
-/*func GetValuesFromEditConfig(cfg string) (*MessageConfig, string, error) {
+func GetValuesFromEditConfig(cfg string) (*EditConfig, error) {
 	data := strings.Split(cfg, " ")
-	if len(data) != 3 {
-		return nil, "", errors.New("invalid edit config")
+	if len(data) != 2 {
+		return nil, errors.New("invalid edit config")
 	}
-	msgCfg := &MessageConfig{}
+	edit := &EditConfig{}
 	var err error
-	msgCfg.ChannelID, err = strconv.ParseInt(data[0], 10, 64)
+	edit.ChannelName = data[0]
+	edit.Cnt, err = strconv.Atoi(data[1])
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
-	msgCfg.MessageID, err = strconv.Atoi(data[1])
-	if err != nil {
-		return nil, "", err
-	}
-	return msgCfg, data[2], nil
-}*/
+	return edit, nil
+}
 
 // GetValuesFromRepostConfig String must contain just data separated by spaces
 func GetValuesFromRepostConfig(cfg string) (*RepostConfig, error) {

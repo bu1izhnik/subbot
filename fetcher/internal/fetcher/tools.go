@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gotd/td/tg"
-	"log"
 	"math/rand"
 	"time"
 )
@@ -52,8 +51,10 @@ func (f *Fetcher) setBotHashAndID(ctx context.Context) error {
 	if len(resolved.Users) > 0 {
 		user := resolved.Users[0]
 		if u, ok := user.(*tg.User); ok {
-			f.botID = u.ID
-			f.botHash = u.AccessHash
+			f.botPeer = &tg.InputPeerUser{
+				UserID:     u.ID,
+				AccessHash: u.AccessHash,
+			}
 		} else {
 			return errors.New(fmt.Sprintf("failed to resolve username of bot (%v): not a user", f.botUsername))
 		}
@@ -71,7 +72,7 @@ func (f *Fetcher) waitForOtherMediaInGroup(groupID int64) {
 	if f.multiMediaQueue.List[groupID] != nil {
 		f.sendChan <- f.multiMediaQueue.List[groupID]
 		delete(f.multiMediaQueue.List, groupID)
-		log.Printf("Forwarded media group: %v", groupID)
+		//log.Printf("Forwarded media group: %v", groupID)
 	}
 }
 

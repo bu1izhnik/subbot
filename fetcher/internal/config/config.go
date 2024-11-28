@@ -7,6 +7,13 @@ import (
 	"strconv"
 )
 
+type RedisConfig struct {
+	Url      string
+	DBid     int
+	Username string
+	Password string
+}
+
 type Config struct {
 	BotUsername string
 	APIURL      string
@@ -16,6 +23,7 @@ type Config struct {
 	Password    string
 	APIID       int
 	APIHash     string
+	Redis       RedisConfig
 }
 
 func Load() {
@@ -27,11 +35,28 @@ func Load() {
 
 func Get() Config {
 	c := Config{}
+	var err error
 
 	c.BotUsername = os.Getenv("BOT_USERNAME")
 	if c.BotUsername == "" {
 		log.Fatal("BOT_USERNAME not found in .env")
 	}
+
+	c.Redis.Url = os.Getenv("REDIS_URL")
+	if c.Redis.Url == "" {
+		log.Fatal("Redis url not found in .env")
+	}
+
+	dbIDStr := os.Getenv("REDIS_DB_ID")
+	if dbIDStr == "" {
+		log.Fatal("Redis db id not found in .env")
+	}
+	if c.Redis.DBid, err = strconv.Atoi(dbIDStr); err != nil {
+		log.Fatalf("Error parsing redis db id to int: %v", err)
+	}
+
+	c.Redis.Username = os.Getenv("REDIS_USERNAME")
+	c.Redis.Password = os.Getenv("REDIS_PASSWORD")
 
 	c.APIURL = os.Getenv("API_URL")
 	if c.APIURL == "" {
@@ -54,16 +79,12 @@ func Get() Config {
 	}
 
 	c.Password = os.Getenv("PASSWORD")
-	if c.Password == "" {
-		log.Fatal("Password not found in .env")
-	}
 
-	API_ID_str := os.Getenv("API_ID")
-	if API_ID_str == "" {
+	apiIDStr := os.Getenv("API_ID")
+	if apiIDStr == "" {
 		log.Fatal("API ID not found in .env")
 	}
-	var err error
-	if c.APIID, err = strconv.Atoi(API_ID_str); err != nil {
+	if c.APIID, err = strconv.Atoi(apiIDStr); err != nil {
 		log.Fatalf("Error parsing API ID to int: %v", err)
 	}
 

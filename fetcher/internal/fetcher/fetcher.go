@@ -2,6 +2,7 @@ package fetcher
 
 import (
 	boltstor "github.com/gotd/contrib/bbolt"
+	"github.com/redis/go-redis/v9"
 	"go.etcd.io/bbolt"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -25,13 +26,11 @@ import (
 	"time"
 )
 
-// TODO: cache messages for handling edits
 // TODO: forward noforward messages by copying text
 
-func Init(apiID int, apiHash string, botUsername string, mediaWait time.Duration) (*Fetcher, error) {
+func Init(redisClient *redis.Client, apiID int, apiHash string, botUsername string, mediaWait time.Duration) (*Fetcher, error) {
 	f := &Fetcher{
-		botID:       0,
-		botHash:     0,
+		redis:       redisClient,
 		botUsername: botUsername,
 		sendChan:    make(chan *sendConfig, 1000),
 		multiMediaQueue: AsyncMap[int64, *sendConfig]{
@@ -85,6 +84,16 @@ func Init(apiID int, apiHash string, botUsername string, mediaWait time.Duration
 		return nil
 	})
 
+	d.OnEditChannelMessage(func(ctx context.Context, e tg.Entities, update *tg.UpdateEditChannelMessage) error {
+		go func(ctx context.Context, e tg.Entities, update *tg.UpdateEditChannelMessage) {
+			editErr := f.handleEdit(ctx, update)
+			if editErr != nil {
+				log.Printf("Error handling edit: %v", editErr)
+			}
+		}(ctx, e, update)
+		return nil
+	})
+
 	f.client = client
 	f.gaps = gaps
 	return f, nil
@@ -133,6 +142,10 @@ func (f *Fetcher) Run(phone string, password string, apiURL string, IP string, p
 			log.Printf("[POSSIBLE ERROR]: couldn't register fetcher by API request (register manualy or restart). HTTP status code: %v", res.StatusCode)
 		}
 
+		if err := f.setBotHashAndID(ctx); err != nil {
+			log.Fatalf("Error setting bot ID and hash: %v", err)
+		}
+
 		log.Printf("Scraper is %s:", user.Username)
 
 		return f.gaps.Run(ctx, f.client.API(), user.ID, updates.AuthOptions{
@@ -152,24 +165,12 @@ func (f *Fetcher) tick(ctx context.Context, interval time.Duration) {
 				continue
 			}
 
-			if f.botID == 0 || f.botHash == 0 {
-				if err := f.setBotHashAndID(ctx); err != nil {
-					log.Printf("Error setting bot ID and hash: %v", err)
-					continue
-				}
-			}
-
-			botPeer := &tg.InputPeerUser{
-				UserID:     f.botID,
-				AccessHash: f.botHash,
-			}
-
 			gotForwardUpdate, err := f.client.API().MessagesForwardMessages(ctx, &tg.MessagesForwardMessagesRequest{
 				FromPeer: &tg.InputPeerChannel{
 					ChannelID:  send.forward.channelID,
 					AccessHash: send.forward.accessHash,
 				},
-				ToPeer:   botPeer,
+				ToPeer:   f.botPeer,
 				ID:       send.forward.messageIDs,
 				RandomID: getRandomIDs(len(send.forward.messageIDs)),
 			})
@@ -189,19 +190,22 @@ func (f *Fetcher) tick(ctx context.Context, interval time.Duration) {
 			}
 
 			messageSentNotAsForward := false
-			maxID := 0
-			cnt := 0
+			maxID, cnt, withTextID := 0, 0, 0
 			for _, update := range forwardUpdate.Updates {
 				switch messageUpdate := update.(type) {
 				case *tg.UpdateMessageID:
 					maxID = max(maxID, messageUpdate.ID)
 					cnt++
 				case *tg.UpdateNewMessage:
-					if messageSentNotAsForward {
-						continue
-					}
 					message, ok := messageUpdate.Message.(*tg.Message)
 					if ok {
+						// Get id of message with text to later handle its edits
+						if message.Message != "" {
+							withTextID = message.ID
+						}
+						if messageSentNotAsForward {
+							continue
+						}
 						if _, ok := message.GetFwdFrom(); !ok {
 							messageSentNotAsForward = true
 						}
@@ -210,9 +214,21 @@ func (f *Fetcher) tick(ctx context.Context, interval time.Duration) {
 			}
 			startID := maxID - cnt + 1
 
+			// caching message in redis db, ignoring reposts, because they can't be edited
+			if send.repost == nil && withTextID != 0 {
+				channelIDStr := strconv.FormatInt(send.forward.channelID, 10)
+				messageIDStr := strconv.Itoa(send.forward.idWithText)
+				messageIDInBotChat := strconv.Itoa(withTextID)
+				//log.Printf("set: %s => %s", "message:"+channelIDStr+":"+messageIDStr, messageIDInBotChat)
+				err = f.redis.Set(ctx, "message:"+channelIDStr+":"+messageIDStr, messageIDInBotChat, time.Hour*72).Err()
+				if err != nil {
+					log.Printf("Error storing message in redis: %v", err)
+				}
+			}
+
 			if send.repost != nil {
 				_, err = f.client.API().MessagesSendMessage(ctx, &tg.MessagesSendMessageRequest{
-					Peer: botPeer,
+					Peer: f.botPeer,
 					Message: fmt.Sprintf(
 						"r %v %s %v",
 						send.repost.toID,
@@ -227,12 +243,26 @@ func (f *Fetcher) tick(ctx context.Context, interval time.Duration) {
 				if err != nil {
 					log.Printf("Error forwarding repost config: %v", err)
 				}
-			} else if send.edit != nil {
-				// Temporarily off
+			} else if send.edit {
+				_, err = f.client.API().MessagesSendMessage(ctx, &tg.MessagesSendMessageRequest{
+					Peer: f.botPeer,
+					Message: fmt.Sprintf(
+						"e %s %v",
+						send.forward.channelName,
+						cnt,
+					),
+					ReplyTo: &tg.InputReplyToMessage{
+						ReplyToMsgID: startID,
+					},
+					RandomID: rand.Int63(),
+				})
+				if err != nil {
+					log.Printf("Error forwarding edit config: %v", err)
+				}
 				continue
 			} else if messageSentNotAsForward { // Message sent no as forward so it needs additional info about channel in config
 				_, err = f.client.API().MessagesSendMessage(ctx, &tg.MessagesSendMessageRequest{
-					Peer: botPeer,
+					Peer: f.botPeer,
 					Message: fmt.Sprintf(
 						"w %v %s %v",
 						send.forward.channelID,
@@ -249,7 +279,7 @@ func (f *Fetcher) tick(ctx context.Context, interval time.Duration) {
 				}
 			} else { // regular post
 				_, err = f.client.API().MessagesSendMessage(ctx, &tg.MessagesSendMessageRequest{
-					Peer: botPeer,
+					Peer: f.botPeer,
 					Message: fmt.Sprintf(
 						"p %v",
 						cnt,

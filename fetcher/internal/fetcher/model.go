@@ -3,6 +3,8 @@ package fetcher
 import (
 	"github.com/gotd/td/telegram"
 	"github.com/gotd/td/telegram/updates"
+	"github.com/gotd/td/tg"
+	"github.com/redis/go-redis/v9"
 	"sync"
 	"time"
 )
@@ -35,21 +37,22 @@ type forwardConfig struct {
 	channelName string
 	accessHash  int64
 	messageIDs  []int
+	idWithText  int
 }
 
 type sendConfig struct {
-	edit    *editConfig
+	edit    bool
 	repost  *repostConfig
 	forward *forwardConfig
 }
 
 type Fetcher struct {
 	client          *telegram.Client
+	redis           *redis.Client
 	gaps            *updates.Manager
 	sendChan        chan *sendConfig
 	multiMediaQueue AsyncMap[int64, *sendConfig]
 	mediaWaitTimer  time.Duration
 	botUsername     string
-	botID           int64
-	botHash         int64
+	botPeer         *tg.InputPeerUser
 }

@@ -29,6 +29,11 @@ type RepostConfig struct {
 	Cnt int
 }
 
+type EditConfig struct {
+	ChannelName string
+	Cnt         int
+}
+
 type WeirdConfig struct {
 	Channel ChannelInfo
 	Cnt     int

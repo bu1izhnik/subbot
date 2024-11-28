@@ -84,7 +84,7 @@ func (b *Bot) handleConfigMessage(ctx context.Context, update tgbotapi.Update) e
 				update.Message.Chat.ID,
 				tools.GetIDs(replyMsg.MessageID, cnt),
 			)
-		} else if update.Message.Text[0] == 'r' { // got repost message config (ex: "r channelID username messageCnt")
+		} else if update.Message.Text[0] == 'r' { // got repost message config (ex: "r channelID channelName messageCnt")
 			rep, err := tools.GetValuesFromRepostConfig(update.Message.Text[2:])
 			if err != nil {
 				return err
@@ -96,10 +96,24 @@ func (b *Bot) handleConfigMessage(ctx context.Context, update tgbotapi.Update) e
 				tools.GetIDs(replyMsg.MessageID, rep.Cnt),
 				"@"+rep.To.Name+" переслал сообщение:",
 			)
-		} else if update.Message.Text[0] == 'e' { // got edit message config (ex: "e cID1 mID2 username")
-			// Temporarily off
+		} else if update.Message.Text[0] == 'e' { // got edit message config (ex: "e channelName messageCnt")
+			edit, err := tools.GetValuesFromEditConfig(update.Message.Text[2:])
+			if err != nil {
+				return err
+			}
+			channelID, err := tools.GetChannelID(replyMsg.ForwardFromChat.ID)
+			if err != nil {
+				return err
+			}
+			return b.forwardPostToSubs(
+				ctx,
+				channelID,
+				update.Message.Chat.ID,
+				tools.GetIDs(replyMsg.MessageID, edit.Cnt),
+				"@"+edit.ChannelName+" отредактировал сообщение:",
+			)
 			return nil
-		} else if update.Message.Text[0] == 'w' { // got config for weird message (doesn't look like forwarded from chan, example - audio files) (ex: "w messageCnt")
+		} else if update.Message.Text[0] == 'w' { // got config for weird message (doesn't look like forwarded from chan, example - audio files) (ex: "w channelName messageCnt")
 			w, err := tools.GetValuesFromWeirdConfig(update.Message.Text[2:])
 			if err != nil {
 				return err
@@ -115,6 +129,10 @@ func (b *Bot) handleConfigMessage(ctx context.Context, update tgbotapi.Update) e
 			return errors.New("message is not from fetcher: incorrect code in the beginning")
 		}
 	} else {
-		return errors.New("message is not from fetcher: not forwarded and text length <= 2")
+		if update.Message.ReplyToMessage != nil {
+			return errors.New("incorrect config")
+		} else {
+			return nil
+		}
 	}
 }

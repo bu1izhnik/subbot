@@ -220,7 +220,7 @@ func (f *Fetcher) tick(ctx context.Context, interval time.Duration) {
 				messageIDStr := strconv.Itoa(send.forward.idWithText)
 				messageIDInBotChat := strconv.Itoa(withTextID)
 				//log.Printf("set: %s => %s", "message:"+channelIDStr+":"+messageIDStr, messageIDInBotChat)
-				err = f.redis.Set(ctx, "message:"+channelIDStr+":"+messageIDStr, messageIDInBotChat, time.Hour*72).Err()
+				err = f.redis.Set(ctx, "message:"+channelIDStr+":"+messageIDStr, messageIDInBotChat, time.Hour*24*7).Err()
 				if err != nil {
 					log.Printf("Error storing message in redis: %v", err)
 				}

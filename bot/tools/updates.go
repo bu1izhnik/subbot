@@ -61,3 +61,19 @@ func GetValuesFromNotForwardConfig(cfg string) (*NotForwardConfig, error) {
 	}
 	return w, nil
 }
+
+// GetValuesFromLinkConfig String must contain just data separated by spaces
+func GetValuesFromLinkConfig(cfg string) (*ChannelInfo, error) {
+	data := strings.Split(cfg, " ")
+	if len(data) != 2 {
+		return nil, errors.New("invalid link config")
+	}
+	info := &ChannelInfo{}
+	var err error
+	info.ID, err = strconv.ParseInt(data[0], 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	info.Name = data[1]
+	return info, nil
+}

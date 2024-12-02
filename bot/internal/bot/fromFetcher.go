@@ -78,17 +78,29 @@ func (b *Bot) handleConfigMessage(ctx context.Context, update tgbotapi.Update) e
 				tools.GetIDs(replyMsg.MessageID, edit.Cnt),
 				"@"+edit.ChannelName+" отредактировал сообщение",
 			)
-		} else if update.Message.Text[0] == 'n' { // got config for not forwardeble message (example - audio files, copied messages from channels with banned forwards) (ex: "n channelName messageCnt")
-			w, err := tools.GetValuesFromNotForwardConfig(update.Message.Text[2:])
+		} else if update.Message.Text[0] == 'n' { // got config for not forwardeble message (example - audio files) (ex: "n channelName messageCnt")
+			nCfg, err := tools.GetValuesFromNotForwardConfig(update.Message.Text[2:])
 			if err != nil {
 				return err
 			}
 			return b.forwardPostToSubs(
 				ctx,
-				w.Channel.ID,
+				nCfg.Channel.ID,
 				update.Message.Chat.ID,
-				tools.GetIDs(replyMsg.MessageID, w.Cnt),
-				"Новое сообщение в канале @"+w.Channel.Name,
+				tools.GetIDs(replyMsg.MessageID, nCfg.Cnt),
+				"Новое сообщение в канале @"+nCfg.Channel.Name,
+			)
+		} else if update.Message.Text[0] == 'l' { // got config for link to message in channel with banned forwards
+			linkCfg, err := tools.GetValuesFromLinkConfig(update.Message.Text[2:])
+			if err != nil {
+				return err
+			}
+			return b.forwardPostToSubs(
+				ctx,
+				linkCfg.ID,
+				0,
+				nil,
+				"Новое сообщение в канале @"+linkCfg.Name+"\n\n"+replyMsg.Text,
 			)
 		} else {
 			return errors.New("message is not from fetcher: incorrect code in the beginning")

@@ -10,6 +10,7 @@ type ChannelData struct {
 	Username   string `json:"username"`
 	ChannelID  int64  `json:"channel_id"`
 	AccessHash int64  `json:"access_hash"`
+	NoForwards bool   `json:"no_forwards"`
 }
 
 func ResolveChannelName(reqURL string) (*ChannelData, error) {
@@ -24,8 +25,6 @@ func ResolveChannelName(reqURL string) (*ChannelData, error) {
 	}
 	if res.StatusCode == http.StatusBadRequest {
 		return nil, errors.New("could not resolve channel name")
-	} else if res.StatusCode == http.StatusForbidden {
-		return nil, errors.New("channel has forbidden forwards")
 	}
 
 	decoder := json.NewDecoder(res.Body)

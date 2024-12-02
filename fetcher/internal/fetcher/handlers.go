@@ -2,8 +2,7 @@ package fetcher
 
 import (
 	"context"
-	"errors"
-	"fmt"
+	"github.com/go-faster/errors"
 	"github.com/gotd/td/tg"
 	"log"
 	"strconv"
@@ -13,8 +12,7 @@ import (
 func (f *Fetcher) handleNewMessage(ctx context.Context, update *tg.UpdateNewChannelMessage) error {
 	channel, msg, err := f.getChannelAndMessageInfo(ctx, update.Message)
 	if err != nil {
-		log.Printf("Error handling new message in channel: %v", err)
-		return err
+		return errors.Errorf("can't get channels info: %v", err)
 	}
 
 	var repostCfg *repostConfig
@@ -37,8 +35,9 @@ func (f *Fetcher) handleNewMessage(ctx context.Context, update *tg.UpdateNewChan
 	}
 
 	sendCfg := sendConfig{
-		repost:  repostCfg,
-		forward: forwardCfg,
+		repost:    repostCfg,
+		forward:   forwardCfg,
+		noForward: channel.Noforwards,
 	}
 
 	if msg.GroupedID != 0 {
@@ -102,7 +101,7 @@ func (f *Fetcher) handleEdit(ctx context.Context, update *tg.UpdateEditChannelMe
 	})
 	messageInBotChat, ok := getMessageInBotChat.(*tg.MessagesMessagesSlice)
 	if !ok {
-		return errors.New(fmt.Sprintf("got unexpected result type from bot's chat: %T", getMessageInBotChat))
+		return errors.Errorf("got unexpected result type from bot's chat: %T", getMessageInBotChat)
 	}
 	if len(messageInBotChat.Messages) == 0 {
 		return errors.New("got empty list of messages from bot's chat")
@@ -110,7 +109,7 @@ func (f *Fetcher) handleEdit(ctx context.Context, update *tg.UpdateEditChannelMe
 
 	messageCopy, ok := messageInBotChat.Messages[0].(*tg.Message)
 	if !ok {
-		return errors.New(fmt.Sprintf("got unexpected message type from bot's chat: %T", messageInBotChat.Messages[0]))
+		return errors.Errorf("got unexpected message type from bot's chat: %T", messageInBotChat.Messages[0])
 	}
 
 	if messageCopy.Message == msg.Message {
@@ -134,7 +133,7 @@ func (f *Fetcher) handleEdit(ctx context.Context, update *tg.UpdateEditChannelMe
 
 		oldMessages, ok := getOldMessages.(*tg.MessagesChannelMessages)
 		if !ok {
-			return errors.New(fmt.Sprintf("got unexpected result type from channel: %T", oldMessages))
+			return errors.Errorf("got unexpected result type from channel: %T", oldMessages)
 		}
 		if len(oldMessages.Messages) == 0 {
 			return errors.New("got empty list of messages from channel")

@@ -14,16 +14,6 @@ type AsyncMap[K comparable, V any] struct {
 	List  map[K]V
 }
 
-// This config sends to main bot when there is need to handle edit
-type editConfig struct {
-	// ID of channel in which edit was done
-	channelID int64
-	// ID of message which was edited
-	messageID int
-	// Name of channel in which edit was done
-	channelName string
-}
-
 // This config sends to main bot when there is need to handle repost
 type repostConfig struct {
 	// ID of channel which reposted
@@ -41,9 +31,10 @@ type forwardConfig struct {
 }
 
 type sendConfig struct {
-	edit    bool
-	repost  *repostConfig
-	forward *forwardConfig
+	forward   *forwardConfig
+	repost    *repostConfig
+	edit      bool
+	noForward bool
 }
 
 type Fetcher struct {

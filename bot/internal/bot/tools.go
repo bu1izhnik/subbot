@@ -74,8 +74,8 @@ func (b *Bot) checkForRateLimits() {
 }
 
 func (b *Bot) forwardPostToSubs(ctx context.Context, channelID int64, fetcherID int64, messageIDs *[]int, additional ...string) error {
-	if len(*messageIDs) == 0 {
-		return errors.New("no messages to forward")
+	if messageIDs == nil && additional == nil {
+		return errors.New("nothing to send")
 	}
 
 	groups, err := b.db.GetSubsOfChannel(ctx, channelID)
@@ -98,6 +98,10 @@ func (b *Bot) forwardPostToSubs(ctx context.Context, channelID int64, fetcherID 
 				)
 				continue
 			}
+		}
+
+		if messageIDs == nil {
+			continue
 		}
 
 		if len(*messageIDs) == 1 {

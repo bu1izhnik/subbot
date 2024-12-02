@@ -159,9 +159,13 @@ func Sub(db *orm.Queries) tools.Command {
 			return err
 		}
 
+		warning := ""
+		if channel.NoForwards {
+			warning = "\n\nИз данного канала нельзя пересылать сообщения, так что новые сообщения из него будут отправляться в группу в виде ссылок на них"
+		}
 		_, err = api.Send(tgbotapi.NewMessage(
 			groupID,
-			"Группа успешно подписанна на @"+channelName,
+			"Группа успешно подписанна на @"+channelName+warning,
 			update.Message.TopicID,
 		))
 		return err

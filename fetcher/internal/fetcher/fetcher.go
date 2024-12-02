@@ -78,7 +78,12 @@ func Init(redisClient *redis.Client, apiID int, apiHash string, botUsername stri
 	})
 
 	d.OnNewChannelMessage(func(ctx context.Context, e tg.Entities, update *tg.UpdateNewChannelMessage) error {
-		go f.handleNewMessage(ctx, update)
+		go func(ctx context.Context, e tg.Entities, update *tg.UpdateNewChannelMessage) {
+			newMessageErr := f.handleNewMessage(ctx, update)
+			if newMessageErr != nil {
+				log.Printf("Error handling new message from channel: %v", newMessageErr)
+			}
+		}(ctx, e, update)
 		return nil
 	})
 
@@ -163,6 +168,62 @@ func (f *Fetcher) tick(ctx context.Context, interval time.Duration) {
 				continue
 			}
 
+			// handle messages which can't be forwarded first
+			if send.noForward {
+				idInLink := send.forward.idWithText
+				if idInLink == 0 {
+					idInLink = send.forward.messageIDs[0]
+					for _, id := range send.forward.messageIDs {
+						idInLink = min(idInLink, id)
+					}
+				}
+				gotSendLinkUpdate, err := f.client.API().MessagesSendMessage(ctx, &tg.MessagesSendMessageRequest{
+					Peer: f.botPeer,
+					Message: fmt.Sprintf(
+						"https://t.me/%s/%d",
+						send.forward.channelName,
+						idInLink,
+					),
+					RandomID: rand.Int63(),
+				})
+				if err != nil {
+					log.Printf("Error forwarding link to post: %v", err)
+					continue
+				}
+				sendLinkUpdate, ok := gotSendLinkUpdate.(*tg.Updates)
+				if !ok {
+					log.Printf("Got incorrect type of update from sending link: %T", sendLinkUpdate)
+					continue
+				}
+				replyToId := 0
+				for _, update := range sendLinkUpdate.Updates {
+					upd, ok := update.(*tg.UpdateMessageID)
+					if ok {
+						replyToId = upd.ID
+					}
+				}
+				if replyToId == 0 {
+					log.Printf("No id to reply with link config")
+					continue
+				}
+				_, err = f.client.API().MessagesSendMessage(ctx, &tg.MessagesSendMessageRequest{
+					Peer: f.botPeer,
+					Message: fmt.Sprintf(
+						"l %v %s",
+						send.forward.channelID,
+						send.forward.channelName,
+					),
+					ReplyTo: &tg.InputReplyToMessage{
+						ReplyToMsgID: replyToId,
+					},
+					RandomID: rand.Int63(),
+				})
+				if err != nil {
+					log.Printf("Error forwarding link config: %v", err)
+				}
+				continue
+			}
+
 			gotForwardUpdate, err := f.client.API().MessagesForwardMessages(ctx, &tg.MessagesForwardMessagesRequest{
 				FromPeer: &tg.InputPeerChannel{
 					ChannelID:  send.forward.channelID,
@@ -213,7 +274,8 @@ func (f *Fetcher) tick(ctx context.Context, interval time.Duration) {
 			startID := maxID - cnt + 1
 
 			// caching message in redis db, ignoring reposts, because they can't be edited
-			if send.repost == nil && withTextID != 0 {
+			// also ignoring no forward messages as they are not stored in chat with bot
+			if send.repost == nil && !send.noForward && withTextID != 0 {
 				messageIDInBotChat := strconv.Itoa(withTextID)
 				//log.Printf("set: %s => %s", "message:"+channelIDStr+":"+messageIDStr, messageIDInBotChat)
 				err = f.redis.Set(

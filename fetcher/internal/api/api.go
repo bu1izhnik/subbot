@@ -11,6 +11,7 @@ type channelData struct {
 	Username   string `json:"username"`
 	ChannelID  int64  `json:"channel_id"`
 	AccessHash int64  `json:"access_hash"`
+	NoForwards bool   `json:"no_forwards"`
 }
 
 type Api struct {
@@ -37,7 +38,7 @@ func (api *Api) Run() error {
 
 func (api *Api) handleSubscribe(w http.ResponseWriter, r *http.Request) {
 	channelName := chi.URLParam(r, "channelName")
-	channelID, accessHash, err := api.f.SubscribeToChannel(r.Context(), channelName)
+	channelID, accessHash, noForwards, err := api.f.SubscribeToChannel(r.Context(), channelName)
 	if err != nil {
 		responseWithError(w, http.StatusBadRequest, err.Error())
 		return
@@ -47,6 +48,7 @@ func (api *Api) handleSubscribe(w http.ResponseWriter, r *http.Request) {
 		Username:   channelName,
 		ChannelID:  channelID,
 		AccessHash: accessHash,
+		NoForwards: noForwards,
 	})
 }
 
@@ -68,14 +70,10 @@ func (api *Api) handleUnsubscribe(w http.ResponseWriter, r *http.Request) {
 
 func (api *Api) handleGetChannelInfo(w http.ResponseWriter, r *http.Request) {
 	channelName := chi.URLParam(r, "channelName")
-	channelID, accessHash, canForward, err := api.f.GetChannelInfo(r.Context(), channelName)
+	channelID, accessHash, noForwards, err := api.f.GetChannelInfo(r.Context(), channelName)
 
 	if err != nil {
 		responseWithError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	if !canForward {
-		responseWithError(w, http.StatusForbidden, "channel has banned forwards")
 		return
 	}
 
@@ -83,5 +81,6 @@ func (api *Api) handleGetChannelInfo(w http.ResponseWriter, r *http.Request) {
 		Username:   channelName,
 		ChannelID:  channelID,
 		AccessHash: accessHash,
+		NoForwards: noForwards,
 	})
 }

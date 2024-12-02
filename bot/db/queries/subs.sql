@@ -18,3 +18,7 @@ WHERE chat = $1;
 -- name: CountSubsOfChannel :one
 SELECT COUNT(*) FROM subs
 WHERE channel = $1;
+
+-- name: CheckSub :one
+SELECT COUNT(1) FROM subs
+WHERE chat = $1 AND channel = $2;

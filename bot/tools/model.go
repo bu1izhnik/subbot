@@ -34,7 +34,7 @@ type EditConfig struct {
 	Cnt         int
 }
 
-type WeirdConfig struct {
+type NotForwardConfig struct {
 	Channel ChannelInfo
 	Cnt     int
 }

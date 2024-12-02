@@ -70,14 +70,14 @@ func Del(db *orm.Queries) tools.Command {
 		}
 
 		if needUserID != update.SentFrom().ID {
-			tools.SendErrorMessage(
-				api,
+			_, err = api.Send(
 				tgbotapi.NewMessage(
 					groupID,
 					"@"+update.SentFrom().UserName+" команда использована другим пользователем.",
 					update.CallbackQuery.Message.TopicID,
 				),
 			)
+			return err
 		}
 
 		channelIDStr := callbackData[2]
@@ -89,6 +89,27 @@ func Del(db *orm.Queries) tools.Command {
 				api,
 				update,
 				"Команда отменена",
+			)
+			return err
+		}
+
+		isSubed, err := db.CheckSub(ctx, orm.CheckSubParams{
+			Chat:    groupID,
+			Channel: channelID,
+		})
+		if err != nil {
+			tools.ResponseToCallbackLogError(
+				api,
+				update,
+				"Не вышло отписаться от канала: internal error.",
+			)
+			return err
+		}
+		if isSubed == 0 {
+			err = tools.ResponseToCallback(
+				api,
+				update,
+				"Группа не подписана на @"+channelName,
 			)
 			return err
 		}

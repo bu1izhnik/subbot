@@ -9,6 +9,23 @@ import (
 	"context"
 )
 
+const checkSub = `-- name: CheckSub :one
+SELECT COUNT(1) FROM subs
+WHERE chat = $1 AND channel = $2
+`
+
+type CheckSubParams struct {
+	Chat    int64
+	Channel int64
+}
+
+func (q *Queries) CheckSub(ctx context.Context, arg CheckSubParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, checkSub, arg.Chat, arg.Channel)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countSubsOfChannel = `-- name: CountSubsOfChannel :one
 SELECT COUNT(*) FROM subs
 WHERE channel = $1

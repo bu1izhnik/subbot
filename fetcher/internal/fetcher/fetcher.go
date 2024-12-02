@@ -265,7 +265,7 @@ func (f *Fetcher) tick(ctx context.Context, interval time.Duration) {
 				_, err = f.client.API().MessagesSendMessage(ctx, &tg.MessagesSendMessageRequest{
 					Peer: f.botPeer,
 					Message: fmt.Sprintf(
-						"w %v %s %v",
+						"n %v %s %v",
 						send.forward.channelID,
 						send.forward.channelName,
 						cnt,

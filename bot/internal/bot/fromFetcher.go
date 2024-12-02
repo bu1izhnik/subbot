@@ -78,9 +78,8 @@ func (b *Bot) handleConfigMessage(ctx context.Context, update tgbotapi.Update) e
 				tools.GetIDs(replyMsg.MessageID, edit.Cnt),
 				"@"+edit.ChannelName+" отредактировал сообщение",
 			)
-			return nil
-		} else if update.Message.Text[0] == 'w' { // got config for weird message (doesn't look like forwarded from chan, example - audio files) (ex: "w channelName messageCnt")
-			w, err := tools.GetValuesFromWeirdConfig(update.Message.Text[2:])
+		} else if update.Message.Text[0] == 'n' { // got config for not forwardeble message (example - audio files, copied messages from channels with banned forwards) (ex: "n channelName messageCnt")
+			w, err := tools.GetValuesFromNotForwardConfig(update.Message.Text[2:])
 			if err != nil {
 				return err
 			}

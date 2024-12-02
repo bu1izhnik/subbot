@@ -42,13 +42,13 @@ func GetValuesFromRepostConfig(cfg string) (*RepostConfig, error) {
 	return rep, nil
 }
 
-// GetValuesFromWeirdConfig String must contain just data separated by spaces
-func GetValuesFromWeirdConfig(cfg string) (*WeirdConfig, error) {
+// GetValuesFromNotForwardConfig String must contain just data separated by spaces
+func GetValuesFromNotForwardConfig(cfg string) (*NotForwardConfig, error) {
 	data := strings.Split(cfg, " ")
 	if len(data) != 3 {
 		return nil, errors.New("invalid wierd config")
 	}
-	w := &WeirdConfig{}
+	w := &NotForwardConfig{}
 	var err error
 	w.Channel.ID, err = strconv.ParseInt(data[0], 10, 64)
 	if err != nil {

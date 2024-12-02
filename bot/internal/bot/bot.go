@@ -3,7 +3,6 @@ package bot
 import (
 	"context"
 	"github.com/BulizhnikGames/subbot/bot/db/orm"
-	"github.com/BulizhnikGames/subbot/bot/internal/commands/middleware"
 	"github.com/BulizhnikGames/subbot/bot/internal/config"
 	"github.com/BulizhnikGames/subbot/bot/tools"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -31,13 +30,13 @@ type Bot struct {
 }
 
 func Init(api *tgbotapi.BotAPI,
-	db *orm.Queries,
+	postgresDB *orm.Queries,
 	timeout time.Duration,
 	rateLimitCfg config.RateLimitConfig,
 	multiMediaWaitTime time.Duration) *Bot {
 	return &Bot{
 		api: api,
-		db:  db,
+		db:  postgresDB,
 
 		commands:  make(map[string]tools.Command),
 		callbacks: make(map[string]tools.Command),
@@ -105,6 +104,8 @@ func (b *Bot) handleUpdate(ctx context.Context, update tgbotapi.Update) error {
 	}
 
 	if update.Message != nil {
+		//log.Printf("Message's topic: %d", update.Message.TopicID)
+
 		msgCmd := update.Message.Command()
 
 		if msgCmd != "" {
@@ -119,15 +120,17 @@ func (b *Bot) handleUpdate(ctx context.Context, update tgbotapi.Update) error {
 
 		if cmd, ok := b.commands[msgCmd]; ok {
 			if msgCmd != "" {
-				return middleware.CheckRateLimit(b, cmd)(ctx, b.api, update)
+				return cmd(ctx, b.api, update)
 			} else {
 				// no need in middleware because it's already implemented in GetUserNext func
 				return cmd(ctx, b.api, update)
 			}
 		} else {
 			_, err := b.api.Send(
-				tgbotapi.NewMessage(update.Message.Chat.ID,
+				tgbotapi.NewMessage(
+					update.Message.Chat.ID,
 					"Несуществующая комманда",
+					update.Message.TopicID,
 				))
 			return err
 		}
@@ -142,7 +145,7 @@ func (b *Bot) handleUpdate(ctx context.Context, update tgbotapi.Update) error {
 		sepIndex := strings.Index(update.CallbackQuery.Data, "#")
 		callbackCmd := update.CallbackQuery.Data[:sepIndex]
 		if cmd, ok := b.callbacks[callbackCmd]; ok {
-			return middleware.CheckRateLimit(b, cmd)(ctx, b.api, update)
+			return cmd(ctx, b.api, update)
 		} else {
 			return tools.ResponseToCallback(b.api, update, "Несуществующая комманда")
 		}

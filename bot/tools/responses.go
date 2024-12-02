@@ -6,7 +6,7 @@ import (
 	"log"
 )
 
-func SendErrorMessage(api *tgbotapi.BotAPI, message tgbotapi.Chattable) {
+func SendErrorMessage(api *tgbotapi.BotAPI, message tgbotapi.MessageConfig) {
 	_, err := api.Send(message)
 	if err != nil {
 		log.Printf("Error sending message: %v", err)

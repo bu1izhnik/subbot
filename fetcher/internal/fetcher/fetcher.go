@@ -26,8 +26,6 @@ import (
 	"time"
 )
 
-// TODO: forward noforward messages by copying text
-
 func Init(redisClient *redis.Client, apiID int, apiHash string, botUsername string, mediaWait time.Duration) (*Fetcher, error) {
 	f := &Fetcher{
 		redis:       redisClient,
@@ -216,11 +214,14 @@ func (f *Fetcher) tick(ctx context.Context, interval time.Duration) {
 
 			// caching message in redis db, ignoring reposts, because they can't be edited
 			if send.repost == nil && withTextID != 0 {
-				channelIDStr := strconv.FormatInt(send.forward.channelID, 10)
-				messageIDStr := strconv.Itoa(send.forward.idWithText)
 				messageIDInBotChat := strconv.Itoa(withTextID)
 				//log.Printf("set: %s => %s", "message:"+channelIDStr+":"+messageIDStr, messageIDInBotChat)
-				err = f.redis.Set(ctx, "message:"+channelIDStr+":"+messageIDStr, messageIDInBotChat, time.Hour*24*7).Err()
+				err = f.redis.Set(
+					ctx,
+					fmt.Sprintf("message:%d:%d", send.forward.channelID, send.forward.idWithText),
+					messageIDInBotChat,
+					time.Hour*24*7,
+				).Err()
 				if err != nil {
 					log.Printf("Error storing message in redis: %v", err)
 				}

@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// For some reason tgbotapi package adds "-100" to all ID's of channels and supergroups, this "-100" need to be removed
+// GetChannelID For some reason all ID's of channels and supergroups have "-100" as prefix, which need to be removed
 func GetChannelID(id int64) (int64, error) {
 	idStr := strconv.FormatInt(id, 10)
 	if len(idStr) <= 4 {

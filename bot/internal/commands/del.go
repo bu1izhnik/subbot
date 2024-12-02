@@ -13,28 +13,32 @@ import (
 
 func DelInit(db *orm.Queries) tools.Command {
 	return func(ctx context.Context, api *tgbotapi.BotAPI, update tgbotapi.Update) error {
-		/*middleware.UserNext.Mutex.Lock()
-		//middleware.UserNext.List[update.Message.From.ID] = middleware.GroupOnly(middleware.AdminOnly(del(db)))
-		middleware.UserNext.List[update.SentFrom().ID] =
-			middleware.CallbackOnly(
-				middleware.GroupOnly(
-					middleware.AdminOnly(del(db))))
-		middleware.UserNext.Mutex.Unlock()*/
-
 		groupID := update.FromChat().ID
 
 		inlineKeyboard, err := getInlineKeyboard(ctx, db, update.SentFrom().ID, groupID)
 		if err != nil {
 			if strings.Contains(err.Error(), "no subs") {
-				tools.SendErrorMessage(api, tgbotapi.NewMessage(groupID, "Не вышло выполнить команду: группа не подписана ни на один канал"))
+				tools.SendErrorMessage(api, tgbotapi.NewMessage(
+					groupID,
+					"Группа не подписана ни на один канал",
+					update.Message.TopicID,
+				))
 				return nil
 			} else {
-				tools.SendErrorMessage(api, tgbotapi.NewMessage(groupID, "Не вышло выполнить команду: ошибка при получении списка подписок группы"))
+				tools.SendErrorMessage(api, tgbotapi.NewMessage(
+					groupID,
+					"Не вышло выполнить команду: ошибка при получении списка подписок группы",
+					update.Message.TopicID,
+				))
 				return err
 			}
 		}
 
-		msg := tgbotapi.NewMessage(groupID, "Выберите канал, от которого хотите отписаться")
+		msg := tgbotapi.NewMessage(
+			groupID,
+			"Выберите канал, от которого хотите отписаться",
+			update.Message.TopicID,
+		)
 		msg.ReplyMarkup = inlineKeyboard
 		_, err = api.Send(msg)
 		return err
@@ -71,6 +75,7 @@ func Del(db *orm.Queries) tools.Command {
 				tgbotapi.NewMessage(
 					groupID,
 					"@"+update.SentFrom().UserName+" команда использована другим пользователем.",
+					update.CallbackQuery.Message.TopicID,
 				),
 			)
 		}

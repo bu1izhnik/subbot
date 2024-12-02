@@ -22,23 +22,28 @@ func (q *Queries) CountSubsOfChannel(ctx context.Context, channel int64) (int64,
 }
 
 const getSubsOfChannel = `-- name: GetSubsOfChannel :many
-SELECT chat FROM subs
+SELECT chat, thread FROM subs
 WHERE channel = $1
 `
 
-func (q *Queries) GetSubsOfChannel(ctx context.Context, channel int64) ([]int64, error) {
+type GetSubsOfChannelRow struct {
+	Chat   int64
+	Thread int64
+}
+
+func (q *Queries) GetSubsOfChannel(ctx context.Context, channel int64) ([]GetSubsOfChannelRow, error) {
 	rows, err := q.db.QueryContext(ctx, getSubsOfChannel, channel)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []int64
+	var items []GetSubsOfChannelRow
 	for rows.Next() {
-		var chat int64
-		if err := rows.Scan(&chat); err != nil {
+		var i GetSubsOfChannelRow
+		if err := rows.Scan(&i.Chat, &i.Thread); err != nil {
 			return nil, err
 		}
-		items = append(items, chat)
+		items = append(items, i)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err
@@ -65,20 +70,21 @@ func (q *Queries) GroupIDChanged(ctx context.Context, arg GroupIDChangedParams) 
 }
 
 const subscribe = `-- name: Subscribe :one
-INSERT INTO subs(chat, channel)
-VALUES ($1, $2)
-RETURNING chat, channel
+INSERT INTO subs(chat, channel, thread)
+VALUES ($1, $2, $3)
+RETURNING chat, channel, thread
 `
 
 type SubscribeParams struct {
 	Chat    int64
 	Channel int64
+	Thread  int64
 }
 
 func (q *Queries) Subscribe(ctx context.Context, arg SubscribeParams) (Sub, error) {
-	row := q.db.QueryRowContext(ctx, subscribe, arg.Chat, arg.Channel)
+	row := q.db.QueryRowContext(ctx, subscribe, arg.Chat, arg.Channel, arg.Thread)
 	var i Sub
-	err := row.Scan(&i.Chat, &i.Channel)
+	err := row.Scan(&i.Chat, &i.Channel, &i.Thread)
 	return i, err
 }
 

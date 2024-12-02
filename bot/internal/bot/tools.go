@@ -3,12 +3,11 @@ package bot
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/BulizhnikGames/subbot/bot/db/orm"
 	"github.com/BulizhnikGames/subbot/bot/tools"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -74,30 +73,74 @@ func (b *Bot) checkForRateLimits() {
 	}
 }
 
-func (b *Bot) forwardMessages(toChat int64, fetcherChat int64, messageIDs *[]int) error {
-	toChatStr := strconv.FormatInt(toChat, 10)
-	fromChatStr := strconv.FormatInt(fetcherChat, 10)
-	messageIDsStr := strings.Builder{}
-	for i, id := range *messageIDs {
-		messageIDsStr.WriteString(strconv.Itoa(id))
-		if i != len(*messageIDs)-1 {
-			messageIDsStr.WriteString(", ")
+func (b *Bot) forwardPostToSubs(ctx context.Context, channelID int64, fetcherID int64, messageIDs *[]int, additional ...string) error {
+	if len(*messageIDs) == 0 {
+		return errors.New("no messages to forward")
+	}
+
+	groups, err := b.db.GetSubsOfChannel(ctx, channelID)
+	if err != nil {
+		return err
+	}
+
+	for _, group := range groups {
+		if len(additional) != 0 {
+			_, err = b.api.Send(tgbotapi.NewMessage(
+				group.Chat,
+				additional[0],
+				int(group.Thread),
+			))
+			if err != nil {
+				log.Printf("Error sending additional mesasge to group %d (thread %d): %v",
+					group.Chat,
+					group.Thread,
+					err,
+				)
+				continue
+			}
+		}
+
+		if len(*messageIDs) == 1 {
+			err = b.forwardMessage(group.Chat, group.Thread, fetcherID, (*messageIDs)[0])
+			if err != nil {
+				log.Printf("Error sending forward from channel %d to group %d (thread %d): %v",
+					channelID,
+					group.Chat,
+					group.Thread,
+					err,
+				)
+			}
+		} else {
+			err = b.forwardMessages(group.Chat, group.Thread, fetcherID, messageIDs)
+			if err != nil {
+				log.Printf("Error sending forward from channel %d to group %d (thread %d): %v",
+					channelID,
+					group.Chat,
+					group.Thread,
+					err,
+				)
+			}
 		}
 	}
-	//messageIDsStr.WriteString("367")
-	//b.api.Send(tgbotapi.NewForward(toChat, fetcherChat, 367))
-	url := fmt.Sprintf("https://api.telegram.org/bot%s/forwardMessages", b.api.Token)
+	return nil
+}
+
+func (b *Bot) forwardMessage(toChat int64, toThread int64, fetcherChat int64, messageID int) error {
+	toThreadStr := ""
+	if toThread != 0 {
+		toThreadStr = fmt.Sprintf(" \"message_thread_id\": %d,", toThread)
+	}
+	url := fmt.Sprintf("https://api.telegram.org/bot%s/forwardMessage", b.api.Token)
 	jsonBody := []byte(
 		fmt.Sprintf(
-			"{\"chat_id\": %s, \"from_chat_id\": %s, \"message_ids\": [ %s ]}",
-			toChatStr,
-			fromChatStr,
-			messageIDsStr.String(),
+			"{\"chat_id\": %d,%s \"from_chat_id\": %d, \"message_id\": %d}",
+			toChat,
+			toThreadStr,
+			fetcherChat,
+			messageID,
 		),
 	)
 	bodyReader := bytes.NewReader(jsonBody)
-
-	//log.Printf("req body: %s", jsonBody)
 
 	req, err := http.NewRequest(http.MethodPost, url, bodyReader)
 	if err != nil {
@@ -105,7 +148,10 @@ func (b *Bot) forwardMessages(toChat int64, fetcherChat int64, messageIDs *[]int
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	res, err := http.DefaultClient.Do(req)
+	_, err = http.DefaultClient.Do(req)
+	return err
+
+	/*res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -123,7 +169,42 @@ func (b *Bot) forwardMessages(toChat int64, fetcherChat int64, messageIDs *[]int
 		return err
 	}
 
-	//log.Printf("Reps: %s", string(data))
+	log.Printf("Reps: %s", string(data))
 
-	return nil
+	return nil*/
+}
+
+func (b *Bot) forwardMessages(toChat int64, toThread int64, fetcherChat int64, messageIDs *[]int) error {
+	toThreadStr := ""
+	if toThread != 0 {
+		toThreadStr = fmt.Sprintf(" \"message_thread_id\": %d,", toThread)
+	}
+	messageIDsStr := strings.Builder{}
+	for i, id := range *messageIDs {
+		messageIDsStr.WriteString(strconv.Itoa(id))
+		if i != len(*messageIDs)-1 {
+			messageIDsStr.WriteString(", ")
+		}
+	}
+	url := fmt.Sprintf("https://api.telegram.org/bot%s/forwardMessages", b.api.Token)
+	jsonBody := []byte(
+		fmt.Sprintf(
+			"{\"chat_id\": %d,%s \"from_chat_id\": %d, \"message_ids\": [ %s ]}",
+			toChat,
+			toThreadStr,
+			fetcherChat,
+			messageIDsStr.String(),
+		),
+	)
+
+	bodyReader := bytes.NewReader(jsonBody)
+
+	req, err := http.NewRequest(http.MethodPost, url, bodyReader)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	_, err = http.DefaultClient.Do(req)
+	return err
 }

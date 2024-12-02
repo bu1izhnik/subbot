@@ -29,40 +29,6 @@ func (b *Bot) handleFromFetcher(ctx context.Context, update tgbotapi.Update) err
 	return nil
 }
 
-func (b *Bot) forwardPostToSubs(ctx context.Context, channelID int64, fetcherID int64, messageIDs *[]int, additional ...string) error {
-	if len(*messageIDs) == 0 {
-		return errors.New("no messages to forward")
-	}
-
-	groups, err := b.db.GetSubsOfChannel(ctx, channelID)
-	if err != nil {
-		return err
-	}
-
-	for _, group := range groups {
-		if len(additional) != 0 {
-			_, err = b.api.Send(tgbotapi.NewMessage(group, additional[0]))
-			if err != nil {
-				log.Printf("Error sending additional mesasge to group %v: %v", group, err)
-				continue
-			}
-		}
-
-		if len(*messageIDs) == 1 {
-			_, err := b.api.Send(tgbotapi.NewForward(group, fetcherID, (*messageIDs)[0]))
-			if err != nil {
-				log.Printf("Error sending forward from channel %v to group %v: %v", channelID, group, err)
-			}
-		} else {
-			err := b.forwardMessages(group, fetcherID, messageIDs)
-			if err != nil {
-				log.Printf("Error sending forward from channel %v to group %v: %v", channelID, group, err)
-			}
-		}
-	}
-	return nil
-}
-
 func (b *Bot) handleConfigMessage(ctx context.Context, update tgbotapi.Update) error {
 	if len(update.Message.Text) > 2 && update.Message.ReplyToMessage != nil {
 		replyMsg := update.Message.ReplyToMessage
@@ -94,7 +60,7 @@ func (b *Bot) handleConfigMessage(ctx context.Context, update tgbotapi.Update) e
 				rep.To.ID,
 				update.Message.Chat.ID,
 				tools.GetIDs(replyMsg.MessageID, rep.Cnt),
-				"@"+rep.To.Name+" переслал сообщение:",
+				"@"+rep.To.Name+" переслал сообщение",
 			)
 		} else if update.Message.Text[0] == 'e' { // got edit message config (ex: "e channelName messageCnt")
 			edit, err := tools.GetValuesFromEditConfig(update.Message.Text[2:])
@@ -110,7 +76,7 @@ func (b *Bot) handleConfigMessage(ctx context.Context, update tgbotapi.Update) e
 				channelID,
 				update.Message.Chat.ID,
 				tools.GetIDs(replyMsg.MessageID, edit.Cnt),
-				"@"+edit.ChannelName+" отредактировал сообщение:",
+				"@"+edit.ChannelName+" отредактировал сообщение",
 			)
 			return nil
 		} else if update.Message.Text[0] == 'w' { // got config for weird message (doesn't look like forwarded from chan, example - audio files) (ex: "w channelName messageCnt")
@@ -123,7 +89,7 @@ func (b *Bot) handleConfigMessage(ctx context.Context, update tgbotapi.Update) e
 				w.Channel.ID,
 				update.Message.Chat.ID,
 				tools.GetIDs(replyMsg.MessageID, w.Cnt),
-				"Новое сообщение в канале @"+w.Channel.Name+":",
+				"Новое сообщение в канале @"+w.Channel.Name,
 			)
 		} else {
 			return errors.New("message is not from fetcher: incorrect code in the beginning")

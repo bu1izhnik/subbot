@@ -2,36 +2,53 @@ package middleware
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"github.com/BulizhnikGames/subbot/bot/tools"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"sync"
+	"github.com/redis/go-redis/v9"
 )
 
-var UserNext tools.AsyncMap[int64, tools.Command]
+var NextCommand map[string]tools.Command
 
 func Init() {
-	UserNext = tools.AsyncMap[int64, tools.Command]{
-		Mutex: sync.Mutex{},
-		List:  make(map[int64]tools.Command),
-	}
+	NextCommand = make(map[string]tools.Command)
 }
 
-func GetUsersNext(bot checker) tools.Command {
+func RegisterCommand(name string, command tools.Command) {
+	NextCommand[name] = command
+}
+
+func GetUsersNext(bot checker, db *redis.Client) tools.Command {
 	return func(ctx context.Context, api *tgbotapi.BotAPI, update tgbotapi.Update) error {
 		userID := update.SentFrom().ID
+		topicID := update.Message.TopicID
 
-		UserNext.Mutex.Lock()
-		command, ok := UserNext.List[userID]
-		UserNext.Mutex.Unlock()
+		key := fmt.Sprintf(
+			"next:%d:%d",
+			userID,
+			topicID,
+		)
+
+		textCmd, err := db.Get(ctx, key).Result()
+		if err != nil {
+			return err
+		}
+
+		command, ok := NextCommand[textCmd]
+
+		db.Del(ctx, key)
 
 		if ok {
-			err := CheckRateLimit(bot, command)(ctx, api, update)
-			UserNext.Mutex.Lock()
-			delete(UserNext.List, userID)
-			UserNext.Mutex.Unlock()
+			err = CheckRateLimit(bot, command)(ctx, api, update)
 			return err
 		} else {
-			return nil
+			return errors.New(fmt.Sprintf(
+				"invalid command stored for user %d (topic %d) in redis: %s",
+				userID,
+				topicID,
+				textCmd,
+			))
 		}
 	}
 }

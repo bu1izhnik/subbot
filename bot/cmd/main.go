@@ -10,12 +10,14 @@ import (
 	"github.com/BulizhnikGames/subbot/bot/internal/config"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	_ "github.com/lib/pq"
+	"github.com/redis/go-redis/v9"
 	"log"
 	"time"
 )
 
 // TODO: improve error handling
-// TODO: forward posts to specific threads
+// TODO: handle photo edits and edits on posts with reply markup
+// TODO: forward noforward messages by copying text
 
 func main() {
 	config.Load()
@@ -27,7 +29,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error initializing bot: %v", err)
 	}
-	tgBotApi.Debug = false
+	//tgBotApi.Debug = true
 
 	dbConn, err := sql.Open("postgres", cfg.DBURL)
 	if err != nil {
@@ -36,6 +38,13 @@ func main() {
 	defer dbConn.Close()
 
 	dbOrm := orm.New(dbConn)
+
+	redisClient := redis.NewClient(&redis.Options{
+		Addr:     cfg.Redis.Url,
+		Username: cfg.Redis.Username,
+		Password: cfg.Redis.Password,
+		DB:       cfg.Redis.DBid,
+	})
 
 	Bot := bot.Init(
 		tgBotApi,
@@ -47,35 +56,63 @@ func main() {
 
 	Bot.RegisterCommand(
 		"list",
-		middleware.GroupOnly(
-			commands.List(dbOrm)),
+		middleware.CheckRateLimit(
+			Bot,
+			middleware.GroupOnly(
+				commands.List(dbOrm),
+			),
+		),
 	)
 	Bot.RegisterCommand(
 		"sub",
-		middleware.AdminOnly(
-			commands.SubInit(dbOrm)),
+		middleware.CheckRateLimit(
+			Bot,
+			middleware.AdminOnly(
+				commands.SubInit(redisClient),
+			),
+		),
 	)
 	Bot.RegisterCommand(
 		"del",
-		middleware.AdminOnly(
-			commands.DelInit(dbOrm)),
+		middleware.CheckRateLimit(
+			Bot,
+			middleware.AdminOnly(
+				commands.DelInit(dbOrm),
+			),
+		),
 	)
 	Bot.RegisterCommand(
 		"help",
-		commands.Help,
+		middleware.CheckRateLimit(
+			Bot,
+			commands.Help,
+		),
 	)
 	Bot.RegisterCommand(
 		"start",
-		commands.Start,
+		middleware.CheckRateLimit(
+			Bot,
+			commands.Start,
+		),
 	)
 	Bot.RegisterCommand(
 		"",
-		middleware.GetUsersNext(Bot),
+		middleware.GetUsersNext(Bot, redisClient),
 	)
 
 	Bot.RegisterCallback(
 		"del",
-		commands.Del(dbOrm),
+		middleware.CheckRateLimit(
+			Bot,
+			commands.Del(dbOrm),
+		),
+	)
+
+	middleware.RegisterCommand(
+		"sub",
+		middleware.AdminOnly(
+			commands.Sub(dbOrm),
+		),
 	)
 
 	go func() {

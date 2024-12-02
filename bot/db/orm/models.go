@@ -21,4 +21,5 @@ type Fetcher struct {
 type Sub struct {
 	Chat    int64
 	Channel int64
+	Thread  int64
 }

@@ -17,7 +17,6 @@ import (
 
 // TODO: improve error handling
 // TODO: handle photo edits and edits on posts with reply markup
-// TODO: forward noforward messages by copying text
 
 func main() {
 	config.Load()

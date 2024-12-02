@@ -7,6 +7,7 @@ import (
 	"github.com/BulizhnikGames/subbot/bot/tools"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/redis/go-redis/v9"
+	"strings"
 )
 
 var NextCommand map[string]tools.Command
@@ -32,6 +33,9 @@ func GetUsersNext(bot checker, db *redis.Client) tools.Command {
 
 		textCmd, err := db.Get(ctx, key).Result()
 		if err != nil {
+			if strings.Contains(err.Error(), "redis: nil") {
+				return nil
+			}
 			return err
 		}
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/go-faster/errors"
 	"github.com/gotd/td/tg"
+	"log"
 	"math/rand"
 	"time"
 )
@@ -18,6 +19,8 @@ func (f *Fetcher) getChannelAndMessageInfo(ctx context.Context, message tg.Messa
 	if !ok {
 		return nil, nil, errors.Errorf("unexpected peer type: %T", msg.PeerID)
 	}
+
+	log.Printf("handling from id: %v", peer.ChannelID)
 
 	getChannel, err := f.client.API().ChannelsGetChannels(ctx, []tg.InputChannelClass{
 		&tg.InputChannel{
@@ -38,6 +41,7 @@ func (f *Fetcher) getChannelAndMessageInfo(ctx context.Context, message tg.Messa
 	if !ok {
 		return nil, nil, errors.Errorf("unexpected channel chat type %T", channelData.Chats[0])
 	}
+	log.Printf("handling from username: %s", channel.Username)
 	return channel, msg, nil
 }
 

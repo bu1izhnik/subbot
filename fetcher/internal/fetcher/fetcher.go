@@ -26,7 +26,11 @@ import (
 	"time"
 )
 
-func Init(redisClient *redis.Client, apiID int, apiHash string, botUsername string, mediaWait time.Duration) (*Fetcher, error) {
+func Init(redisClient *redis.Client,
+	apiID int,
+	apiHash string,
+	botUsername string,
+	mediaWait time.Duration) (*Fetcher, error) {
 	f := &Fetcher{
 		redis:       redisClient,
 		botUsername: botUsername,

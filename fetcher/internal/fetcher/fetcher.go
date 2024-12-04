@@ -194,6 +194,7 @@ func (f *Fetcher) tick(ctx context.Context, interval time.Duration) {
 					log.Printf("Error forwarding link to post: %v", err)
 					continue
 				}
+				log.Printf("forwarded link: %s, %d", send.forward.channelName, idInLink)
 				sendLinkUpdate, ok := gotSendLinkUpdate.(*tg.Updates)
 				if !ok {
 					log.Printf("Got incorrect type of update from sending link: %T", sendLinkUpdate)
@@ -245,6 +246,8 @@ func (f *Fetcher) tick(ctx context.Context, interval time.Duration) {
 				)
 				continue
 			}
+
+			log.Printf("forwarded post: %v, %s, %v", send.forward.channelID, send.forward.channelName, send.forward.messageIDs[0])
 
 			forwardUpdate, ok := gotForwardUpdate.(*tg.Updates)
 			if !ok {

@@ -40,6 +40,8 @@ func (f *Fetcher) handleNewMessage(ctx context.Context, update *tg.UpdateNewChan
 		noForward: channel.Noforwards,
 	}
 
+	log.Printf("handle multimedia: %v, %s", channel.ID, channel.Username)
+
 	if msg.GroupedID != 0 {
 		f.handleMultimedia(
 			msg.GroupedID,
@@ -47,6 +49,8 @@ func (f *Fetcher) handleNewMessage(ctx context.Context, update *tg.UpdateNewChan
 		)
 		return nil
 	}
+
+	log.Printf("to chan: %v, %s", channel.ID, channel.Username)
 
 	f.sendChan <- &sendCfg
 

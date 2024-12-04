@@ -75,7 +75,7 @@ func (f *Fetcher) waitForOtherMediaInGroup(groupID int64) {
 	if f.multiMediaQueue.List[groupID] != nil {
 		f.sendChan <- f.multiMediaQueue.List[groupID]
 		delete(f.multiMediaQueue.List, groupID)
-		//log.Printf("Forwarded media group: %v", groupID)
+		log.Printf("Forwarded media group: %v", groupID)
 	}
 }
 

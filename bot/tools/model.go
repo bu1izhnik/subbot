@@ -47,3 +47,5 @@ type RateLimitConfig struct {
 type GetFetcherRequest func(ctx context.Context, db *orm.Queries) (*FetcherParams, error)
 
 type Command func(ctx context.Context, api *tgbotapi.BotAPI, update tgbotapi.Update) error
+
+type MiddlewareFunc func(next Command) Command

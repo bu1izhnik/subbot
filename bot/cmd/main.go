@@ -8,6 +8,7 @@ import (
 	"github.com/BulizhnikGames/subbot/bot/internal/commands"
 	"github.com/BulizhnikGames/subbot/bot/internal/commands/middleware"
 	"github.com/BulizhnikGames/subbot/bot/internal/config"
+	"github.com/BulizhnikGames/subbot/bot/tools"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	_ "github.com/lib/pq"
 	"github.com/redis/go-redis/v9"
@@ -53,10 +54,14 @@ func main() {
 		2*time.Second,
 	)
 
+	botRateLimit := func(next tools.Command) tools.Command {
+		return middleware.CheckRateLimit(Bot, next)
+	}
+	rateLimitAndAdmin := middleware.CreateStack(botRateLimit, middleware.AdminOnly)
+
 	Bot.RegisterCommand(
 		"list",
-		middleware.CheckRateLimit(
-			Bot,
+		botRateLimit(
 			middleware.GroupOnly(
 				commands.List(dbOrm),
 			),
@@ -64,35 +69,19 @@ func main() {
 	)
 	Bot.RegisterCommand(
 		"sub",
-		middleware.CheckRateLimit(
-			Bot,
-			middleware.AdminOnly(
-				commands.SubInit(redisClient),
-			),
-		),
+		rateLimitAndAdmin(commands.SubInit(redisClient)),
 	)
 	Bot.RegisterCommand(
 		"del",
-		middleware.CheckRateLimit(
-			Bot,
-			middleware.AdminOnly(
-				commands.DelInit(dbOrm),
-			),
-		),
+		rateLimitAndAdmin(commands.DelInit(dbOrm)),
 	)
 	Bot.RegisterCommand(
 		"help",
-		middleware.CheckRateLimit(
-			Bot,
-			commands.Help,
-		),
+		botRateLimit(commands.Help),
 	)
 	Bot.RegisterCommand(
 		"start",
-		middleware.CheckRateLimit(
-			Bot,
-			commands.Start,
-		),
+		botRateLimit(commands.Start),
 	)
 	Bot.RegisterCommand(
 		"",
@@ -101,17 +90,12 @@ func main() {
 
 	Bot.RegisterCallback(
 		"del",
-		middleware.CheckRateLimit(
-			Bot,
-			commands.Del(dbOrm),
-		),
+		botRateLimit(commands.Del(dbOrm)),
 	)
 
 	middleware.RegisterCommand(
 		"sub",
-		middleware.AdminOnly(
-			commands.Sub(dbOrm),
-		),
+		botRateLimit(commands.Sub(dbOrm)),
 	)
 
 	go func() {

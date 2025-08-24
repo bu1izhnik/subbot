@@ -31,7 +31,7 @@ func main() {
 	}
 	//tgBotApi.Debug = true
 
-	dbConn, err := sql.Open("postgres", cfg.DBURL)
+	dbConn, err := sql.Open("postgres", cfg.PostgresURL)
 	if err != nil {
 		log.Fatalf("Error connecting to database: %v", err)
 	}

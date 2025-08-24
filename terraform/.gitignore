@@ -1,0 +1,6 @@
+secrets.auto.tfvars
+.terraform/
+envs/fetcher-?.env
+*.hcl
+.terraform*
+terraform.*

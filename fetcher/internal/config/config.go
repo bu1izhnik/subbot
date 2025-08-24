@@ -27,10 +27,8 @@ type Config struct {
 }
 
 func Load() {
-	err := godotenv.Load(".env")
-	if err != nil {
-		log.Fatal(err)
-	}
+	// Нет обработки ошибки, так как возможен запуск без .env
+	godotenv.Load(".env")
 }
 
 func Get() Config {
@@ -58,10 +56,11 @@ func Get() Config {
 	c.Redis.Username = os.Getenv("REDIS_USERNAME")
 	c.Redis.Password = os.Getenv("REDIS_PASSWORD")
 
-	c.APIURL = os.Getenv("API_URL")
-	if c.APIURL == "" {
-		log.Fatal("API URL not found in .env")
+	API := os.Getenv("API")
+	if API == "" {
+		log.Fatal("API not found in .env")
 	}
+	c.APIURL = "http://" + API
 
 	c.IP = os.Getenv("IP")
 	if c.IP == "" {

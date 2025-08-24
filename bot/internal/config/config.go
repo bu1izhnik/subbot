@@ -25,18 +25,16 @@ type RateLimitConfig struct {
 }
 
 type Config struct {
-	BotToken string
-	DBURL    string
-	Port     string
+	BotToken    string
+	PostgresURL string
+	Port        string
 	RateLimitConfig
 	Redis RedisConfig
 }
 
 func Load() {
-	err := godotenv.Load(".env")
-	if err != nil {
-		log.Fatal(err)
-	}
+	// Нет обработки ошибки, так как возможен запуск без .env
+	godotenv.Load(".env")
 }
 
 func Get() Config {
@@ -47,9 +45,9 @@ func Get() Config {
 		log.Fatal("Bot token not found in .env")
 	}
 
-	c.DBURL = os.Getenv("DB_URL")
-	if c.DBURL == "" {
-		log.Fatal("DB URL not found in .env")
+	c.PostgresURL = os.Getenv("POSTGRES_URL")
+	if c.PostgresURL == "" {
+		log.Fatal("POSTGRES URL not found in .env")
 	}
 
 	c.Redis.Url = os.Getenv("REDIS_URL")

@@ -105,7 +105,7 @@ variable "fetcher_env_dir" {
   description = "Path to a folder with *.env files for fetcher replicas."
 
   validation {
-    condition     = length(fileset(var.fetcher_env_dir, "*.env")) >= var.fetcher_replicas
-    error_message = "Not enough .env files in var.fetcher_env_dir to cover var.fetcher_replicas."
+    condition     = length(fileset(var.fetcher_env_dir, "*.env")) > 0
+    error_message = "fetcher_env_dir must contain at least one .env file."
   }
 }
